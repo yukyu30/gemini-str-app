@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import AudioFileCard, { AudioFileData, TranscriptionType } from './AudioFileCard'
 import FileDropZone from './FileDropZone'
-import { GEMINI_MODELS } from '../constants/prompts'
+import { GEMINI_MODELS } from '../constants/config'
 import './Transcription.css'
 
 const Transcription = () => {

@@ -1,7 +1,7 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 import AudioUpload from './AudioUpload'
-import { API_LIMITS } from '../constants/prompts'
+import { API_LIMITS } from '../constants/config'
 
 // Mock file objects
 const createMockFile = (name: string, size: number, type: string) => {

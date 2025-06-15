@@ -1,5 +1,5 @@
 import { useState, useRef, DragEvent, ChangeEvent } from 'react';
-import { SUPPORTED_AUDIO_FORMATS, API_LIMITS } from '../constants/prompts';
+import { SUPPORTED_AUDIO_FORMATS, API_LIMITS } from '../constants/config';
 import './AudioUpload.css';
 
 interface AudioUploadProps {
