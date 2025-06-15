@@ -28,9 +28,9 @@ const AudioUpload = ({ onFileSelect, onError }: AudioUploadProps) => {
     }
 
     // Check file size (convert MB to bytes)
-    const maxSizeBytes = API_LIMITS.MAX_INLINE_SIZE_MB * 1024 * 1024
+    const maxSizeBytes = API_LIMITS.MAX_FILE_SIZE_MB * 1024 * 1024
     if (file.size > maxSizeBytes) {
-      return `ファイルサイズが${API_LIMITS.MAX_INLINE_SIZE_MB}MBを超えています`
+      return `ファイルサイズが${API_LIMITS.MAX_FILE_SIZE_MB}MBを超えています`
     }
 
     return null
@@ -101,7 +101,7 @@ const AudioUpload = ({ onFileSelect, onError }: AudioUploadProps) => {
           対応形式: {getSupportedFormatsText()}
         </p>
         <p className="size-limit">
-          最大ファイルサイズ: {API_LIMITS.MAX_INLINE_SIZE_MB}MB
+          最大ファイルサイズ: {API_LIMITS.MAX_FILE_SIZE_MB}MB (1GB)
         </p>
 
         <input

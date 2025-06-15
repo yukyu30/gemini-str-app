@@ -1,7 +1,7 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 import AudioUpload from './AudioUpload'
-import { SUPPORTED_AUDIO_FORMATS, API_LIMITS } from '../constants/prompts'
+import { API_LIMITS } from '../constants/prompts'
 
 // Mock file objects
 const createMockFile = (name: string, size: number, type: string) => {
@@ -44,13 +44,13 @@ describe('AudioUpload Component', () => {
     render(<AudioUpload onFileSelect={mockOnFileSelect} onError={mockOnError} />)
     
     const fileInput = screen.getByLabelText('音声ファイルを選択')
-    const largeFile = createMockFile('large.mp3', 25 * 1024 * 1024, 'audio/mp3') // 25MB
+    const largeFile = createMockFile('large.mp3', 1025 * 1024 * 1024, 'audio/mp3') // 1025MB
     
     fireEvent.change(fileInput, { target: { files: [largeFile] } })
     
     await waitFor(() => {
       expect(mockOnError).toHaveBeenCalledWith(
-        `ファイルサイズが${API_LIMITS.MAX_INLINE_SIZE_MB}MBを超えています`
+        `ファイルサイズが${API_LIMITS.MAX_FILE_SIZE_MB}MBを超えています`
       )
       expect(mockOnFileSelect).not.toHaveBeenCalled()
     })

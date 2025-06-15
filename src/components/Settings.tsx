@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/core'
+import './Settings.css'
 
 const Settings = () => {
   const [apiKey, setApiKey] = useState('')
