@@ -206,4 +206,42 @@ describe('Stage Merger Logic', () => {
     expect(result.finalTranscription.status).toBe('completed')
     expect((result.finalTranscription as any).result).toBe('Final SRT result')
   })
+
+  it('should not mark completed dictionary step as skipped', () => {
+    // This tests the user's actual reported scenario:
+    // Dictionary step is completed but was showing as "skipped"
+    const actualStages = {
+      initialTranscription: {
+        name: '基本文字起こし (Gemini 2.0 Flash)',
+        status: 'completed' as const,
+        result: 'Transcription result'
+      },
+      topicAnalysis: {
+        name: 'トピック分析 (Gemini 2.0 Flash)',  
+        status: 'completed' as const,
+        result: 'Topic analysis result'
+      },
+      dictionaryCreation: {
+        name: '辞書作成 (Google検索+Gemini 2.0 Flash)',
+        status: 'completed' as const,
+        result: 'Dictionary was created successfully'
+      },
+      finalTranscription: {
+        name: '最終字幕生成 (Gemini 2.5 Pro)',
+        status: 'completed' as const,
+        result: 'Final SRT result'
+      }
+    }
+
+    const result = mergeStagesWithDefaults(actualStages)
+    
+    // All stages should be completed including dictionary creation
+    expect(result.initialTranscription.status).toBe('completed')
+    expect(result.topicAnalysis.status).toBe('completed')
+    expect(result.dictionaryCreation.status).toBe('completed')
+    expect(result.finalTranscription.status).toBe('completed')
+    
+    // Dictionary creation should have its result preserved
+    expect((result.dictionaryCreation as any).result).toBe('Dictionary was created successfully')
+  })
 })

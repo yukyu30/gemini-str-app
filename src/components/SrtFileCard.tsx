@@ -833,10 +833,13 @@ const SrtFileCard = ({ audioFile, onUpdate, onDelete }: SrtFileCardProps) => {
                       stage.status === 'completed' || stage.status === 'error';
 
                     // ステップがスキップされたかどうかを判定
+                    // 実際のステージデータが存在しない かつ 後続のステップが完了している場合のみスキップ
                     const stageKeys = Object.keys(stages);
                     const currentIndex = stageKeys.indexOf(key);
+                    const hasActualStageData = audioFile.stages?.[key as keyof typeof audioFile.stages];
                     const isLikelySkipped =
                       stage.status === 'pending' &&
+                      !hasActualStageData &&
                       audioFile.stages &&
                       stageKeys.slice(currentIndex + 1).some((laterKey) => {
                         const laterStage =
@@ -857,6 +860,7 @@ const SrtFileCard = ({ audioFile, onUpdate, onDelete }: SrtFileCardProps) => {
                             key as keyof typeof audioFile.stages
                           ],
                         merged: stage,
+                        hasActualStageData,
                         isLikelySkipped,
                       });
                     }
