@@ -11,6 +11,7 @@ import {
   CheckCircle,
   AlertCircle,
   Loader2,
+  Eye,
 } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -31,6 +32,7 @@ import { storageUtils } from '@/utils/storage';
 import { formatFileSize } from '@/lib/utils';
 import { downloadSrtFile, parseSrt, validateSrt } from '@/lib/srt-utils';
 import { useToast } from '@/hooks/use-toast';
+import AudioSubtitlePreview from './AudioSubtitlePreview';
 
 interface SrtFileCardProps {
   audioFile: AudioFile;
@@ -42,6 +44,7 @@ const SrtFileCard = ({ audioFile, onUpdate, onDelete }: SrtFileCardProps) => {
   const [showSettings, setShowSettings] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
   const [showGeminiDebug, setShowGeminiDebug] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
   const { toast } = useToast();
 
   const saveFileTemporarily = async (file: File): Promise<string> => {
@@ -397,6 +400,16 @@ const SrtFileCard = ({ audioFile, onUpdate, onDelete }: SrtFileCardProps) => {
                   ? 'テキストダウンロード (.srt)'
                   : 'SRTダウンロード'}
               </Button>
+              {audioFile.subtitles && audioFile.subtitles.length > 0 && (
+                <Button
+                  onClick={() => setShowPreview(!showPreview)}
+                  variant="secondary"
+                  className="flex items-center gap-2"
+                >
+                  <Eye className="h-4 w-4" />
+                  {showPreview ? 'プレビューを隠す' : '字幕プレビュー'}
+                </Button>
+              )}
               <Button
                 onClick={() => setShowGeminiDebug(!showGeminiDebug)}
                 variant="ghost"
@@ -470,6 +483,18 @@ const SrtFileCard = ({ audioFile, onUpdate, onDelete }: SrtFileCardProps) => {
           </div>
         )}
 
+        {/* Subtitle Preview Section */}
+        {audioFile.status === 'completed' && 
+          showPreview && 
+          audioFile.subtitles && 
+          audioFile.subtitles.length > 0 && (
+            <div className="space-y-3">
+              <AudioSubtitlePreview
+                audioFile={audioFile.file}
+                subtitles={audioFile.subtitles}
+              />
+            </div>
+          )}
 
         {/* Gemini Debug Section */}
         {audioFile.status === 'completed' &&
