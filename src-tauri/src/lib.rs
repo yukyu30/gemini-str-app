@@ -216,6 +216,7 @@ async fn enhance_transcription_with_dictionary(
     dictionary: String, 
     max_chars_per_subtitle: u32,
     enable_speaker_detection: bool,
+    duration_ms: Option<u32>,
     api_key: String
 ) -> Result<String, String> {
     if api_key.trim().is_empty() {
@@ -225,10 +226,17 @@ async fn enhance_transcription_with_dictionary(
     let client = GeminiClient::new(api_key);
     
     // 既存の文字起こしを辞書を使ってSRT形式に変換するプロンプト
+    let duration_text = if let Some(duration) = duration_ms {
+        format!("**音声ファイルの長さ: {}分{}秒 ({}ms)**\n音声の長さを考慮して、適切な字幕の分割と表示タイミングを決定してください。\n\n", 
+                duration / 60000, (duration % 60000) / 1000, duration)
+    } else {
+        String::new()
+    };
+    
     let prompt = format!(
         r#"以下の文字起こしテキストを、高品質なSRT（SubRip Text）ファイル形式に変換してください。
 
-# 元の文字起こし
+{}# 元の文字起こし
 {}
 
 # 専門用語辞書
@@ -255,6 +263,7 @@ SRT形式のテキストのみを出力してください。説明や前置き�
 00:00:05,000 --> 00:00:08,000
 二番目の字幕テキスト
 "#,
+        duration_text,
         initial_transcription,
         dictionary,
         max_chars_per_subtitle,

@@ -96,7 +96,7 @@ ${transcription}
 export const DICTIONARY_CREATION_PROMPT = (topic: string) => `${topic}に出てくる用語の辞書を構築して。
 表記、ふりがなのみをセットでcsv形式で記載してください。topic自体に誤字脱字がないか確認してから、辞書を作成してください。
 日本語話者がわかるような辞書にして
-出力はCSVで、CSVだけを納品してください`;
+**最終的にCSVのみを出力してください。説明や前置きは不要です。**`;
 
 // 4段階目: 最終SRT生成用プロンプト（辞書付き）
 export const FINAL_SRT_PROMPT = (durationMs?: number, maxCharsPerSubtitle: number = 20, enableSpeakerDetection: boolean = true, dictionary?: string) => {
