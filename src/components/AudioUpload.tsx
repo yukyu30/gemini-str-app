@@ -1,88 +1,90 @@
-import { useState, useRef, DragEvent, ChangeEvent } from 'react'
-import { SUPPORTED_AUDIO_FORMATS, API_LIMITS } from '../constants/prompts'
-import './AudioUpload.css'
+import { useState, useRef, DragEvent, ChangeEvent } from 'react';
+import { SUPPORTED_AUDIO_FORMATS, API_LIMITS } from '../constants/prompts';
+import './AudioUpload.css';
 
 interface AudioUploadProps {
-  onFileSelect: (file: File) => void
-  onError: (error: string) => void
+  onFileSelect: (file: File) => void;
+  onError: (error: string) => void;
 }
 
 const AudioUpload = ({ onFileSelect, onError }: AudioUploadProps) => {
-  const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  const [isDragOver, setIsDragOver] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const formatFileSize = (bytes: number): string => {
-    if (bytes === 0) return '0 B'
-    const k = 1024
-    const sizes = ['B', 'KB', 'MB', 'GB']
-    const i = Math.floor(Math.log(bytes) / Math.log(k))
-    const size = bytes / Math.pow(k, i)
-    return (size % 1 === 0 ? size.toString() : size.toFixed(2)) + ' ' + sizes[i]
-  }
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    const size = bytes / Math.pow(k, i);
+    return (
+      (size % 1 === 0 ? size.toString() : size.toFixed(2)) + ' ' + sizes[i]
+    );
+  };
 
   const validateFile = (file: File): string | null => {
     // Check file type
     if (!SUPPORTED_AUDIO_FORMATS.includes(file.type as any)) {
-      return '対応していないファイル形式です'
+      return `${file.type}は対応していないファイル形式です`;
     }
 
     // Check file size (convert MB to bytes)
-    const maxSizeBytes = API_LIMITS.MAX_FILE_SIZE_MB * 1024 * 1024
+    const maxSizeBytes = API_LIMITS.MAX_FILE_SIZE_MB * 1024 * 1024;
     if (file.size > maxSizeBytes) {
-      return `ファイルサイズが${API_LIMITS.MAX_FILE_SIZE_MB}MBを超えています`
+      return `ファイルサイズが${API_LIMITS.MAX_FILE_SIZE_MB}MBを超えています`;
     }
 
-    return null
-  }
+    return null;
+  };
 
   const handleFileSelection = (file: File) => {
-    const error = validateFile(file)
+    const error = validateFile(file);
     if (error) {
-      onError(error)
-      return
+      onError(error);
+      return;
     }
 
-    setSelectedFile(file)
-    onFileSelect(file)
-  }
+    setSelectedFile(file);
+    onFileSelect(file);
+  };
 
   const handleFileInputChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files
+    const files = e.target.files;
     if (files && files.length > 0) {
-      handleFileSelection(files[0])
+      handleFileSelection(files[0]);
     }
-  }
+  };
 
   const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
-    e.preventDefault()
-    setIsDragOver(true)
-  }
+    e.preventDefault();
+    setIsDragOver(true);
+  };
 
   const handleDragLeave = (e: DragEvent<HTMLDivElement>) => {
-    e.preventDefault()
-    setIsDragOver(false)
-  }
+    e.preventDefault();
+    setIsDragOver(false);
+  };
 
   const handleDrop = (e: DragEvent<HTMLDivElement>) => {
-    e.preventDefault()
-    setIsDragOver(false)
+    e.preventDefault();
+    setIsDragOver(false);
 
-    const files = e.dataTransfer.files
+    const files = e.dataTransfer.files;
     if (files && files.length > 0) {
-      handleFileSelection(files[0])
+      handleFileSelection(files[0]);
     }
-  }
+  };
 
   const handleClickUpload = () => {
-    fileInputRef.current?.click()
-  }
+    fileInputRef.current?.click();
+  };
 
   const getSupportedFormatsText = () => {
-    return SUPPORTED_AUDIO_FORMATS
-      .map(format => format.split('/')[1].toUpperCase())
-      .join(', ')
-  }
+    return SUPPORTED_AUDIO_FORMATS.map((format) =>
+      format.split('/')[1].toUpperCase()
+    ).join(', ');
+  };
 
   return (
     <div className="audio-upload">
@@ -132,7 +134,7 @@ const AudioUpload = ({ onFileSelect, onError }: AudioUploadProps) => {
         </div>
       )}
     </div>
-  )
-}
+  );
+};
 
-export default AudioUpload
+export default AudioUpload;

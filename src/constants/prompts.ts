@@ -47,6 +47,7 @@ export const TRANSCRIPTION_PROMPTS = {
 
 export const SUPPORTED_AUDIO_FORMATS = [
   'audio/wav',
+  'audio/x-wav',
   'audio/mp3', 
   'audio/aiff',
   'audio/aac',
