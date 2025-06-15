@@ -1,298 +1,199 @@
 import { useState } from 'react'
-import { invoke } from '@tauri-apps/api/core'
-import AudioUpload from './AudioUpload'
-import { TRANSCRIPTION_PROMPTS, GEMINI_MODELS } from '../constants/prompts'
-import { storageUtils } from '../utils/storage'
+import AudioFileCard, { AudioFileData, TranscriptionType } from './AudioFileCard'
+import FileDropZone from './FileDropZone'
+import { GEMINI_MODELS } from '../constants/prompts'
 import './Transcription.css'
 
-type TranscriptionType = 'basic' | 'srt' | 'summary'
-
-interface TranscriptionState {
-  file: File | null
-  transcriptionType: TranscriptionType
-  selectedModel: string
-  isTranscribing: boolean
-  result: string
-  error: string
-  progress: string
-  copySuccess: boolean
-}
-
 const Transcription = () => {
-  const [state, setState] = useState<TranscriptionState>({
-    file: null,
-    transcriptionType: 'basic',
-    selectedModel: GEMINI_MODELS[0].id,
-    isTranscribing: false,
-    result: '',
-    error: '',
-    progress: '',
-    copySuccess: false
+  const [audioFiles, setAudioFiles] = useState<AudioFileData[]>([])
+  const [globalError, setGlobalError] = useState('')
+  const [globalSettings, setGlobalSettings] = useState<{
+    defaultModel: string
+    defaultTranscriptionType: TranscriptionType
+  }>({
+    defaultModel: GEMINI_MODELS[0].id,
+    defaultTranscriptionType: 'basic'
   })
 
-  const handleFileSelect = (file: File) => {
-    setState(prev => ({
-      ...prev,
+  const handleFilesAdded = (files: File[]) => {
+    const newAudioFiles = files.map(file => ({
+      id: `${Date.now()}-${Math.random()}`,
       file,
+      transcriptionType: globalSettings.defaultTranscriptionType,
+      selectedModel: globalSettings.defaultModel,
+      status: 'idle' as const,
       result: '',
       error: '',
-      copySuccess: false
+      progress: ''
     }))
+
+    setAudioFiles(prev => [...prev, ...newAudioFiles])
+    setGlobalError('')
+  }
+
+  const handleFileUpdate = (id: string, updates: Partial<AudioFileData>) => {
+    setAudioFiles(prev => 
+      prev.map(file => 
+        file.id === id ? { ...file, ...updates } : file
+      )
+    )
+  }
+
+  const handleFileDelete = (id: string) => {
+    setAudioFiles(prev => prev.filter(file => file.id !== id))
   }
 
   const handleFileError = (error: string) => {
-    setState(prev => ({
-      ...prev,
-      error,
-      file: null
-    }))
+    setGlobalError(error)
   }
 
-  const handleTranscriptionTypeChange = (type: TranscriptionType) => {
-    setState(prev => ({ ...prev, transcriptionType: type }))
-  }
-
-  const handleModelChange = (modelId: string) => {
-    setState(prev => ({ ...prev, selectedModel: modelId }))
-  }
-
-  const getPromptForType = (type: TranscriptionType): string => {
-    switch (type) {
-      case 'basic':
-        return TRANSCRIPTION_PROMPTS.BASIC_TRANSCRIPT
-      case 'srt':
-        return TRANSCRIPTION_PROMPTS.SRT_FORMAT()
-      case 'summary':
-        return TRANSCRIPTION_PROMPTS.SUMMARY
-      default:
-        return TRANSCRIPTION_PROMPTS.BASIC_TRANSCRIPT
+  const handleBulkAction = (action: 'start' | 'retry' | 'delete') => {
+    switch (action) {
+      case 'start':
+        audioFiles
+          .filter(audioFile => audioFile.status === 'idle')
+          .forEach(() => {
+            // Trigger transcription for each idle file
+            // This will be handled by individual AudioFileCard components
+          })
+        break
+      case 'retry':
+        audioFiles
+          .filter(audioFile => audioFile.status === 'error')
+          .forEach(audioFile => {
+            handleFileUpdate(audioFile.id, { status: 'idle' })
+          })
+        break
+      case 'delete':
+        setAudioFiles(prev => prev.filter(audioFile => audioFile.status !== 'completed'))
+        break
     }
   }
 
-  const saveFileTemporarily = async (file: File): Promise<string> => {
-    // Convert file to array buffer
-    const arrayBuffer = await file.arrayBuffer()
-    const uint8Array = new Uint8Array(arrayBuffer)
+  const getStatusCounts = () => {
+    const counts = {
+      idle: 0,
+      processing: 0,
+      completed: 0,
+      error: 0
+    }
     
-    // Save to temporary file using Tauri command
-    const tempFilePath = await invoke<string>('save_temp_file', {
-      fileData: Array.from(uint8Array),
-      fileName: file.name
+    audioFiles.forEach(file => {
+      counts[file.status]++
     })
     
-    return tempFilePath
+    return counts
   }
 
-  const startTranscription = async () => {
-    if (!state.file) return
-
-    // Check API key from localStorage first
-    const apiKey = storageUtils.getApiKey()
-    if (!apiKey) {
-      setState(prev => ({
-        ...prev,
-        error: 'API key not found. Please set your Gemini API key in settings.'
+  const applyGlobalSettings = () => {
+    setAudioFiles(prev => 
+      prev.map(file => ({
+        ...file,
+        transcriptionType: globalSettings.defaultTranscriptionType,
+        selectedModel: globalSettings.defaultModel
       }))
-      return
-    }
-
-    setState(prev => ({
-      ...prev,
-      isTranscribing: true,
-      result: '',
-      error: '',
-      progress: 'ファイルを準備中...'
-    }))
-
-    try {
-      // Save file temporarily
-      const tempFilePath = await saveFileTemporarily(state.file)
-      
-      setState(prev => ({ ...prev, progress: 'Gemini APIにアップロード中...' }))
-      
-      const prompt = getPromptForType(state.transcriptionType)
-      
-      const result = await invoke<string>('transcribe_audio', {
-        filePath: tempFilePath,
-        prompt,
-        model: state.selectedModel,
-        apiKey
-      })
-
-      setState(prev => ({
-        ...prev,
-        isTranscribing: false,
-        result,
-        progress: ''
-      }))
-    } catch (error) {
-      setState(prev => ({
-        ...prev,
-        isTranscribing: false,
-        error: `エラーが発生しました: ${error}`,
-        progress: ''
-      }))
-    }
+    )
   }
 
-  const cancelTranscription = () => {
-    setState(prev => ({
-      ...prev,
-      isTranscribing: false,
-      progress: ''
-    }))
-  }
-
-  const downloadResult = () => {
-    if (!state.result) return
-
-    const element = document.createElement('a')
-    const file = new Blob([state.result], { type: 'text/plain' })
-    element.href = URL.createObjectURL(file)
-    element.download = `transcription_${Date.now()}.txt`
-    document.body.appendChild(element)
-    element.click()
-    document.body.removeChild(element)
-    URL.revokeObjectURL(element.href)
-  }
-
-  const copyToClipboard = async () => {
-    if (!state.result) return
-
-    try {
-      await navigator.clipboard.writeText(state.result)
-      setState(prev => ({ ...prev, copySuccess: true }))
-      setTimeout(() => {
-        setState(prev => ({ ...prev, copySuccess: false }))
-      }, 2000)
-    } catch (error) {
-      console.error('Failed to copy to clipboard:', error)
-    }
-  }
+  const statusCounts = getStatusCounts()
 
   return (
     <div className="transcription">
       <h2>音声文字起こし</h2>
       
-      <div className="upload-section">
-        <AudioUpload 
-          onFileSelect={handleFileSelect}
-          onError={handleFileError}
-        />
-      </div>
+      <FileDropZone 
+        onFilesAdded={handleFilesAdded}
+        onError={handleFileError}
+      />
 
-      {state.error && (
+      {globalError && (
         <div className="error-message">
-          {state.error}
+          {globalError}
         </div>
       )}
 
-      {state.file && !state.isTranscribing && !state.result && (
-        <div className="transcription-options">
-          <h3>モデルを選択</h3>
-          <div className="model-group">
-            {GEMINI_MODELS.map((model) => (
-              <label key={model.id} className="model-option">
-                <input
-                  type="radio"
-                  name="selectedModel"
-                  value={model.id}
-                  checked={state.selectedModel === model.id}
-                  onChange={() => handleModelChange(model.id)}
-                />
-                <span>{model.name}</span>
-                <small>{model.description}</small>
-              </label>
+      {audioFiles.length > 0 && (
+        <>
+          <div className="control-panel">
+            <div className="status-summary">
+              <span className="status-item">待機中: {statusCounts.idle}</span>
+              <span className="status-item">処理中: {statusCounts.processing}</span>
+              <span className="status-item">完了: {statusCounts.completed}</span>
+              <span className="status-item">エラー: {statusCounts.error}</span>
+            </div>
+            
+            <div className="global-settings">
+              <div className="setting-group">
+                <label>デフォルトモデル</label>
+                <select
+                  value={globalSettings.defaultModel}
+                  onChange={(e) => setGlobalSettings(prev => ({ 
+                    ...prev, 
+                    defaultModel: e.target.value 
+                  }))}
+                >
+                  {GEMINI_MODELS.map((model) => (
+                    <option key={model.id} value={model.id}>
+                      {model.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              
+              <div className="setting-group">
+                <label>デフォルトタイプ</label>
+                <select
+                  value={globalSettings.defaultTranscriptionType}
+                  onChange={(e) => setGlobalSettings(prev => ({ 
+                    ...prev, 
+                    defaultTranscriptionType: e.target.value as TranscriptionType 
+                  }))}
+                >
+                  <option value="basic">基本的な文字起こし</option>
+                  <option value="srt">SRT字幕形式</option>
+                  <option value="summary">要約</option>
+                </select>
+              </div>
+              
+              <button 
+                className="apply-settings-btn"
+                onClick={applyGlobalSettings}
+              >
+                設定を全ファイルに適用
+              </button>
+            </div>
+            
+            <div className="bulk-actions">
+              {statusCounts.error > 0 && (
+                <button 
+                  className="bulk-btn retry-btn"
+                  onClick={() => handleBulkAction('retry')}
+                >
+                  エラーファイルを再試行
+                </button>
+              )}
+              {statusCounts.completed > 0 && (
+                <button 
+                  className="bulk-btn delete-btn"
+                  onClick={() => handleBulkAction('delete')}
+                >
+                  完了ファイルを削除
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="audio-files-list">
+            {audioFiles.map(fileData => (
+              <AudioFileCard
+                key={fileData.id}
+                fileData={fileData}
+                onUpdate={handleFileUpdate}
+                onDelete={handleFileDelete}
+              />
             ))}
           </div>
-
-          <h3>文字起こしタイプを選択</h3>
-          <div className="option-group">
-            <label className="option">
-              <input
-                type="radio"
-                name="transcriptionType"
-                value="basic"
-                checked={state.transcriptionType === 'basic'}
-                onChange={() => handleTranscriptionTypeChange('basic')}
-              />
-              <span>基本的な文字起こし</span>
-              <small>音声をそのまま文字に変換します</small>
-            </label>
-            
-            <label className="option">
-              <input
-                type="radio"
-                name="transcriptionType"
-                value="srt"
-                checked={state.transcriptionType === 'srt'}
-                onChange={() => handleTranscriptionTypeChange('srt')}
-              />
-              <span>SRT字幕形式</span>
-              <small>タイムスタンプ付きの字幕形式で出力します</small>
-            </label>
-            
-            <label className="option">
-              <input
-                type="radio"
-                name="transcriptionType"
-                value="summary"
-                checked={state.transcriptionType === 'summary'}
-                onChange={() => handleTranscriptionTypeChange('summary')}
-              />
-              <span>要約</span>
-              <small>音声内容を要約して出力します</small>
-            </label>
-          </div>
-
-          <button 
-            className="start-button"
-            onClick={startTranscription}
-            disabled={!state.file}
-          >
-            文字起こし開始
-          </button>
-        </div>
-      )}
-
-      {state.isTranscribing && (
-        <div className="transcription-progress">
-          <div className="progress-indicator">
-            <div className="spinner"></div>
-            <span>文字起こし中...</span>
-          </div>
-          <p className="progress-text">{state.progress}</p>
-          <button 
-            className="cancel-button"
-            onClick={cancelTranscription}
-          >
-            キャンセル
-          </button>
-        </div>
-      )}
-
-      {state.result && (
-        <div className="transcription-result">
-          <h3>文字起こし結果</h3>
-          <div className="result-actions">
-            <button onClick={copyToClipboard} className="action-button">
-              📋 クリップボードにコピー
-            </button>
-            <button onClick={downloadResult} className="action-button">
-              💾 テキストファイルをダウンロード
-            </button>
-          </div>
-          
-          {state.copySuccess && (
-            <div className="copy-success">
-              クリップボードにコピーしました
-            </div>
-          )}
-          
-          <div className="result-content">
-            <pre>{state.result}</pre>
-          </div>
-        </div>
+        </>
       )}
     </div>
   )

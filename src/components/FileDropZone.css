@@ -1,0 +1,89 @@
+.file-drop-zone {
+  border: 2px dashed #d1d5db;
+  border-radius: 8px;
+  padding: 3rem 2rem;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background-color: #f9fafb;
+  margin-bottom: 2rem;
+}
+
+.file-drop-zone:hover {
+  border-color: #6366f1;
+  background-color: #f8faff;
+}
+
+.file-drop-zone.drag-over {
+  border-color: #4f46e5;
+  background-color: #eef2ff;
+  transform: scale(1.02);
+  box-shadow: 0 10px 25px rgba(79, 70, 229, 0.1);
+}
+
+.drop-zone-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.drop-zone-icon {
+  font-size: 3rem;
+  opacity: 0.6;
+  transition: transform 0.3s ease;
+}
+
+.file-drop-zone:hover .drop-zone-icon,
+.file-drop-zone.drag-over .drop-zone-icon {
+  transform: scale(1.1);
+}
+
+.drop-zone-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.drop-zone-text h3 {
+  margin: 0;
+  color: #374151;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.drop-zone-text > p {
+  margin: 0;
+  color: #6b7280;
+  font-size: 1rem;
+}
+
+.drop-zone-info {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.drop-zone-info p {
+  margin: 0.25rem 0;
+  color: #9ca3af;
+  font-size: 0.875rem;
+}
+
+@media (max-width: 768px) {
+  .file-drop-zone {
+    padding: 2rem 1rem;
+  }
+  
+  .drop-zone-icon {
+    font-size: 2rem;
+  }
+  
+  .drop-zone-text h3 {
+    font-size: 1.1rem;
+  }
+  
+  .drop-zone-text > p {
+    font-size: 0.9rem;
+  }
+}
