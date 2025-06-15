@@ -71,6 +71,7 @@ const mockAudioFile: AudioFile = {
     maxCharsPerSubtitle: 20,
     enableSpeakerDetection: false,
     removeFillerWords: true,
+    enableAdvancedProcessing: false,
   },
   status: 'completed',
   result: '1\n00:00:00,000 --> 00:00:03,000\nHello world\n\n2\n00:00:03,000 --> 00:00:06,000\nThis is a test subtitle',

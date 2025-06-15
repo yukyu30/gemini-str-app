@@ -27,7 +27,7 @@ import {
 } from '@/components/ui/select';
 
 import { AudioFile, SrtSettings } from '@/types/srt';
-import { SRT_PROMPT } from '@/constants/prompts';
+import { SRT_PROMPT, INITIAL_TRANSCRIPTION_PROMPT } from '@/constants/prompts';
 import { storageUtils } from '@/utils/storage';
 import { formatFileSize } from '@/lib/utils';
 import { downloadSrtFile, parseSrt, validateSrt } from '@/lib/srt-utils';
@@ -69,7 +69,11 @@ const SrtFileCard = ({ audioFile, onUpdate, onDelete }: SrtFileCardProps) => {
       return;
     }
 
-    await startBasicTranscription(apiKey);
+    if (audioFile.settings.enableAdvancedProcessing) {
+      await startAdvancedTranscription(apiKey);
+    } else {
+      await startBasicTranscription(apiKey);
+    }
   };
 
   const startBasicTranscription = async (apiKey: string) => {
@@ -132,6 +136,118 @@ const SrtFileCard = ({ audioFile, onUpdate, onDelete }: SrtFileCardProps) => {
     }
   };
 
+  const startAdvancedTranscription = async (apiKey: string) => {
+    onUpdate(audioFile.id, {
+      status: 'processing',
+      error: undefined,
+      progress: 'ステップ 1/6: ファイルを一時保存中...',
+    });
+
+    try {
+      const tempFilePath = await saveFileTemporarily(audioFile.file);
+
+      // ステップ1: 基本文字起こし
+      onUpdate(audioFile.id, {
+        progress: 'ステップ 2/6: 基本文字起こし中... (Gemini 2.0 Flash)',
+      });
+
+      const initialPrompt = INITIAL_TRANSCRIPTION_PROMPT();
+      const initialResult = await invoke<string>('transcribe_audio', {
+        filePath: tempFilePath,
+        prompt: initialPrompt,
+        model: 'gemini-2.0-flash',
+        apiKey,
+      });
+
+      // ステップ2: トピック分析
+      onUpdate(audioFile.id, {
+        progress: 'ステップ 3/6: 会話トピック分析中... (Gemini 2.0 Flash)',
+      });
+
+      const topicResult = await invoke<string>('analyze_topic', {
+        transcription: initialResult,
+        apiKey,
+      });
+
+      onUpdate(audioFile.id, {
+        analyzedTopic: topicResult,
+      });
+
+      // ステップ3: 辞書作成
+      const topicLine = topicResult
+        .split('\n')
+        .find((line) => line.includes('メイントピック:'));
+      const mainTopic = topicLine
+        ? topicLine.replace('メイントピック:', '').trim()
+        : 'この会話';
+
+      onUpdate(audioFile.id, {
+        progress: `ステップ 4/6: ${mainTopic}に関する用語集を生成中... (Google検索+Gemini 2.0 Flash)`,
+      });
+
+      let dictionary = '';
+      if (audioFile.settings.customDictionaryPath) {
+        // カスタム辞書を読み込み
+        dictionary = await invoke<string>('load_dictionary_csv', {
+          filePath: audioFile.settings.customDictionaryPath,
+        });
+      } else {
+        // 自動生成
+        dictionary = await invoke<string>('create_dictionary', {
+          topic: topicResult,
+          apiKey,
+        });
+
+        // 生成した辞書をエクスポート
+        const baseName = audioFile.file.name.replace(/\.[^/.]+$/, '');
+        const savedPath = await invoke<string>('save_dictionary_csv', {
+          content: dictionary,
+          suggestedFilename: `${baseName}_dictionary.csv`,
+        });
+        console.log('Dictionary saved to:', savedPath);
+      }
+
+      onUpdate(audioFile.id, {
+        dictionary,
+      });
+
+      // ステップ4: 最終SRT生成
+      onUpdate(audioFile.id, {
+        progress: 'ステップ 5/6: 高精度SRT字幕生成中... (Gemini 2.5 Pro)',
+      });
+
+      const finalResult = await invoke<string>(
+        'enhance_transcription_with_dictionary',
+        {
+          initialTranscription: initialResult,
+          dictionary: dictionary,
+          maxCharsPerSubtitle: audioFile.settings.maxCharsPerSubtitle,
+          enableSpeakerDetection: audioFile.settings.enableSpeakerDetection,
+          apiKey,
+        }
+      );
+
+      onUpdate(audioFile.id, { progress: 'ステップ 6/6: SRT形式の検証中...' });
+
+      // Parse and validate SRT
+      const subtitles = parseSrt(finalResult);
+      const validation = validateSrt(finalResult);
+
+      onUpdate(audioFile.id, {
+        status: 'completed',
+        result: finalResult,
+        subtitles: validation.isValid ? subtitles : undefined,
+        progress: undefined,
+        srtValidation: validation,
+      });
+    } catch (error) {
+      onUpdate(audioFile.id, {
+        status: 'error',
+        error: `高度処理でエラーが発生しました: ${error}`,
+        progress: undefined,
+      });
+    }
+  };
 
   const retryTranscription = () => {
     startTranscription();
@@ -179,6 +295,38 @@ const SrtFileCard = ({ audioFile, onUpdate, onDelete }: SrtFileCardProps) => {
     }
   };
 
+  const downloadDictionary = async () => {
+    if (!audioFile.dictionary) {
+      toast({
+        variant: 'destructive',
+        title: 'ダウンロードエラー',
+        description: 'ダウンロードできる辞書がありません',
+      });
+      return;
+    }
+
+    const baseName = audioFile.file.name.replace(/\.[^/.]+$/, '');
+    const filename = `${baseName}_dictionary.csv`;
+
+    try {
+      await invoke<string>('save_dictionary_csv', {
+        content: audioFile.dictionary,
+        suggestedFilename: filename,
+      });
+      toast({
+        variant: 'success',
+        title: 'ダウンロード完了',
+        description: `辞書CSV (${filename}) をダウンロードしました`,
+      });
+    } catch (error) {
+      console.error('Dictionary download failed:', error);
+      toast({
+        variant: 'destructive',
+        title: 'ダウンロードエラー',
+        description: '辞書のダウンロードに失敗しました',
+      });
+    }
+  };
 
   const updateSettings = (key: keyof SrtSettings, value: any) => {
     onUpdate(audioFile.id, {
@@ -277,6 +425,11 @@ const SrtFileCard = ({ audioFile, onUpdate, onDelete }: SrtFileCardProps) => {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium">生成進行状況</span>
+              <span className="text-xs text-muted-foreground">
+                {audioFile.settings.enableAdvancedProcessing
+                  ? '高精度モード'
+                  : '標準モード'}
+              </span>
             </div>
             <Progress value={undefined} className="h-3" />
             <div className="flex items-center gap-2">
@@ -377,6 +530,41 @@ const SrtFileCard = ({ audioFile, onUpdate, onDelete }: SrtFileCardProps) => {
               </Select>
             </div>
 
+            <div className="md:col-span-2 space-y-2">
+              <label className="text-sm font-medium">
+                処理モード
+                <span className="text-xs text-muted-foreground ml-2">
+                  (現在:{' '}
+                  {audioFile.settings.enableAdvancedProcessing
+                    ? '高精度モード'
+                    : '標準モード'}
+                  )
+                </span>
+              </label>
+              <Select
+                value={
+                  audioFile.settings.enableAdvancedProcessing ? 'true' : 'false'
+                }
+                onValueChange={(value) =>
+                  updateSettings('enableAdvancedProcessing', value === 'true')
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="false">標準モード - 高速処理</SelectItem>
+                  <SelectItem value="true">
+                    高精度モード - トピック分析＋専門用語辞書
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              {audioFile.settings.enableAdvancedProcessing && (
+                <p className="text-xs text-muted-foreground">
+                  高精度モードでは、文字起こし→トピック分析→辞書作成→最終生成の処理を行います
+                </p>
+              )}
+            </div>
           </div>
         )}
 
@@ -400,6 +588,17 @@ const SrtFileCard = ({ audioFile, onUpdate, onDelete }: SrtFileCardProps) => {
                   ? 'テキストダウンロード (.srt)'
                   : 'SRTダウンロード'}
               </Button>
+              {audioFile.settings.enableAdvancedProcessing &&
+                audioFile.dictionary && (
+                  <Button
+                    onClick={downloadDictionary}
+                    variant="outline"
+                    className="flex items-center gap-2"
+                  >
+                    <Download className="h-4 w-4" />
+                    辞書CSVダウンロード
+                  </Button>
+                )}
               {audioFile.subtitles && audioFile.subtitles.length > 0 && (
                 <Button
                   onClick={() => setShowPreview(!showPreview)}
@@ -410,16 +609,18 @@ const SrtFileCard = ({ audioFile, onUpdate, onDelete }: SrtFileCardProps) => {
                   {showPreview ? 'プレビューを隠す' : '字幕プレビュー'}
                 </Button>
               )}
-              <Button
-                onClick={() => setShowGeminiDebug(!showGeminiDebug)}
-                variant="ghost"
-                className="flex items-center gap-2"
-              >
-                <FileText className="h-4 w-4" />
-                {showGeminiDebug
-                  ? 'Geminiデバッグを隠す'
-                  : 'Geminiデバッグを表示'}
-              </Button>
+              {!audioFile.settings.enableAdvancedProcessing && (
+                <Button
+                  onClick={() => setShowGeminiDebug(!showGeminiDebug)}
+                  variant="ghost"
+                  className="flex items-center gap-2"
+                >
+                  <FileText className="h-4 w-4" />
+                  {showGeminiDebug
+                    ? 'Geminiデバッグを隠す'
+                    : 'Geminiデバッグを表示'}
+                </Button>
+              )}
               <Button
                 onClick={retryTranscription}
                 variant="outline"
@@ -496,9 +697,10 @@ const SrtFileCard = ({ audioFile, onUpdate, onDelete }: SrtFileCardProps) => {
             </div>
           )}
 
-        {/* Gemini Debug Section */}
+        {/* Gemini Debug Section (for standard mode) */}
         {audioFile.status === 'completed' &&
           showGeminiDebug &&
+          !audioFile.settings.enableAdvancedProcessing &&
           audioFile.result && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">

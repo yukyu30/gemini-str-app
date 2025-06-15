@@ -9,6 +9,8 @@ export interface SrtSettings {
   maxCharsPerSubtitle: number
   enableSpeakerDetection: boolean
   removeFillerWords: boolean
+  enableAdvancedProcessing: boolean
+  customDictionaryPath?: string
 }
 
 export interface SrtValidation {
@@ -27,10 +29,15 @@ export interface AudioFile {
   error?: string
   progress?: string
   srtValidation?: SrtValidation
+  // 高精度モード用
+  dictionary?: string
+  analyzedTopic?: string
 }
 
 export const DEFAULT_SRT_SETTINGS: SrtSettings = {
   maxCharsPerSubtitle: 20,
   enableSpeakerDetection: false,
-  removeFillerWords: true
+  removeFillerWords: true,
+  enableAdvancedProcessing: false,
+  customDictionaryPath: undefined
 }

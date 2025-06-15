@@ -40,7 +40,8 @@ describe('SrtFileCard', () => {
     settings: {
       maxCharsPerSubtitle: 20,
       enableSpeakerDetection: false,
-      removeFillerWords: true
+      removeFillerWords: true,
+      enableAdvancedProcessing: false
     },
     status: 'idle'
   }
@@ -158,10 +159,14 @@ describe('SrtFileCard', () => {
   })
 
   describe('Dictionary Download', () => {
-    it('should not show dictionary download button as feature was removed', () => {
+    it('should not show dictionary download button when advanced processing is disabled', () => {
       const audioFileWithResult = {
         ...mockAudioFile,
         status: 'completed' as const,
+        settings: {
+          ...mockAudioFile.settings,
+          enableAdvancedProcessing: false
+        },
         result: 'Some result'
       }
 
@@ -173,8 +178,32 @@ describe('SrtFileCard', () => {
         />
       )
 
-      // Should not find dictionary download button as feature was removed
+      // Should not find dictionary download button when advanced processing is disabled
       expect(screen.queryByRole('button', { name: /辞書CSVダウンロード/ })).not.toBeInTheDocument()
+    })
+
+    it('should show dictionary download button when advanced processing is enabled and dictionary exists', () => {
+      const audioFileWithDictionary = {
+        ...mockAudioFile,
+        status: 'completed' as const,
+        settings: {
+          ...mockAudioFile.settings,
+          enableAdvancedProcessing: true
+        },
+        result: 'Some result',
+        dictionary: 'test,dictionary,csv,content'
+      }
+
+      render(
+        <SrtFileCard 
+          audioFile={audioFileWithDictionary}
+          onUpdate={mockOnUpdate}
+          onDelete={mockOnDelete}
+        />
+      )
+
+      // Should find dictionary download button when advanced processing is enabled and dictionary exists
+      expect(screen.getByRole('button', { name: /辞書CSVダウンロード/ })).toBeInTheDocument()
     })
   })
 })
