@@ -53,7 +53,7 @@ async fn delete_api_key() -> Result<bool, String> {
 }
 
 #[tauri::command]
-async fn transcribe_audio(file_path: String, prompt: String) -> Result<String, String> {
+async fn transcribe_audio(file_path: String, prompt: String, model: Option<String>) -> Result<String, String> {
     // Get API key
     let entry = Entry::new(SERVICE_NAME, API_KEY_ENTRY)
         .map_err(|e| format!("Failed to create keyring entry: {}", e))?;
@@ -89,8 +89,11 @@ async fn transcribe_audio(file_path: String, prompt: String) -> Result<String, S
     client.wait_for_file_processing(&file_info.name).await
         .map_err(|e| format!("File processing failed: {}", e))?;
 
+    // Use provided model or default to gemini-2.0-flash
+    let selected_model = model.unwrap_or_else(|| "gemini-2.0-flash".to_string());
+
     // Generate transcription
-    let transcription = client.generate_content(&file_info.uri, &file_info.mime_type, &prompt).await
+    let transcription = client.generate_content(&file_info.uri, &file_info.mime_type, &prompt, &selected_model).await
         .map_err(|e| format!("Failed to generate transcription: {}", e))?;
 
     Ok(transcription)

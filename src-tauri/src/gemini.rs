@@ -139,7 +139,7 @@ impl GeminiClient {
         Ok(upload_response.file)
     }
 
-    pub async fn generate_content(&self, file_uri: &str, mime_type: &str, prompt: &str) -> Result<String, Box<dyn std::error::Error>> {
+    pub async fn generate_content(&self, file_uri: &str, mime_type: &str, prompt: &str, model: &str) -> Result<String, Box<dyn std::error::Error>> {
         let request = GenerateContentRequest {
             contents: vec![Content {
                 parts: vec![
@@ -156,7 +156,7 @@ impl GeminiClient {
             }],
         };
 
-        let url = format!("{}/v1beta/models/gemini-2.0-flash:generateContent?key={}", self.base_url, self.api_key);
+        let url = format!("{}/v1beta/models/{}:generateContent?key={}", self.base_url, model, self.api_key);
         
         let response = self.client
             .post(&url)
