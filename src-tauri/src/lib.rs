@@ -54,6 +54,26 @@ async fn delete_api_key() -> Result<bool, String> {
 }
 
 #[tauri::command]
+async fn get_api_key_preview() -> Result<String, String> {
+    let entry = Entry::new(SERVICE_NAME, API_KEY_ENTRY)
+        .map_err(|e| format!("Failed to create keyring entry: {}", e))?;
+    
+    match entry.get_password() {
+        Ok(password) => {
+            if password.trim().is_empty() {
+                Ok(String::new())
+            } else if password.len() > 4 {
+                Ok(format!("****{}", &password[password.len()-4..]))
+            } else {
+                Ok("****".to_string())
+            }
+        },
+        Err(keyring::Error::NoEntry) => Ok(String::new()),
+        Err(e) => Err(format!("Failed to retrieve API key: {}", e)),
+    }
+}
+
+#[tauri::command]
 async fn transcribe_audio(file_path: String, prompt: String, model: Option<String>) -> Result<String, String> {
     // Get API key
     let entry = Entry::new(SERVICE_NAME, API_KEY_ENTRY)
@@ -137,6 +157,7 @@ pub fn run() {
             greet,
             set_api_key,
             get_api_key,
+            get_api_key_preview,
             delete_api_key,
             transcribe_audio,
             get_transcription_progress,
