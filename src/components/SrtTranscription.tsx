@@ -176,7 +176,7 @@ const SrtTranscription = () => {
               {/* Global Settings */}
               <div className="space-y-4">
                 <h4 className="font-medium">デフォルト設定</h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-muted/50 rounded-md">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-muted/50 rounded-md">
                     <div className="space-y-2">
                       <label className="text-sm font-medium">最大文字数/字幕</label>
                       <Select 
@@ -216,33 +216,8 @@ const SrtTranscription = () => {
                       </Select>
                     </div>
 
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">
-                        処理モード
-                        <span className="text-xs text-muted-foreground ml-2">
-                          (現在: {globalSettings.enableAdvancedProcessing ? '高精度モード' : '標準モード'})
-                        </span>
-                      </label>
-                      <Select 
-                        value={globalSettings.enableAdvancedProcessing ? 'true' : 'false'}
-                        onValueChange={(value) => updateGlobalSetting('enableAdvancedProcessing', value === 'true')}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="false">標準モード - 高速処理</SelectItem>
-                          <SelectItem value="true">高精度モード - トピック分析＋専門用語辞書</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      {globalSettings.enableAdvancedProcessing && (
-                        <p className="text-xs text-muted-foreground">
-                          高精度モードでは、文字起こし→トピック分析→Google検索で正確性を確認した辞書作成→最終生成の4段階処理を行います
-                        </p>
-                      )}
-                    </div>
 
-                  <div className="md:col-span-3 flex gap-2">
+                  <div className="md:col-span-2 flex gap-2">
                     <Button
                       variant="outline"
                       onClick={applyGlobalSettings}

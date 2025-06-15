@@ -9,8 +9,6 @@ export interface SrtSettings {
   maxCharsPerSubtitle: number
   enableSpeakerDetection: boolean
   removeFillerWords: boolean
-  enableAdvancedProcessing: boolean
-  customDictionaryPath?: string
 }
 
 export interface SrtValidation {
@@ -18,13 +16,6 @@ export interface SrtValidation {
   errors: string[]
 }
 
-export interface ProcessingStage {
-  name: string
-  status: 'pending' | 'processing' | 'completed' | 'error'
-  result?: string
-  error?: string
-  description?: string
-}
 
 export interface AudioFile {
   id: string
@@ -36,28 +27,10 @@ export interface AudioFile {
   error?: string
   progress?: string
   srtValidation?: SrtValidation
-  // 多段階処理の情報
-  stages?: {
-    initialTranscription?: ProcessingStage
-    topicAnalysis?: ProcessingStage
-    dictionaryCreation?: ProcessingStage
-    finalTranscription?: ProcessingStage
-  }
-  analyzedTopic?: string
-  dictionary?: string
-  // Geminiデバッグ情報
-  geminiDebugInfo?: {
-    initialTranscription?: { request: any; response: any }
-    topicAnalysis?: { request: any; response: any }
-    dictionaryCreation?: { request: any; response: any }
-    finalTranscription?: { request: any; response: any }
-  }
 }
 
 export const DEFAULT_SRT_SETTINGS: SrtSettings = {
   maxCharsPerSubtitle: 20,
-  enableSpeakerDetection: false, // デフォルトを false に変更
-  removeFillerWords: true,
-  enableAdvancedProcessing: false,
-  customDictionaryPath: undefined
+  enableSpeakerDetection: false,
+  removeFillerWords: true
 }

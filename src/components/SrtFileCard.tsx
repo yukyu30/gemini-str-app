@@ -26,7 +26,7 @@ import {
 } from '@/components/ui/select';
 
 import { AudioFile, SrtSettings } from '@/types/srt';
-import { SRT_PROMPT, INITIAL_TRANSCRIPTION_PROMPT } from '@/constants/prompts';
+import { SRT_PROMPT } from '@/constants/prompts';
 import { storageUtils } from '@/utils/storage';
 import { formatFileSize } from '@/lib/utils';
 import { downloadSrtFile, parseSrt, validateSrt } from '@/lib/srt-utils';
@@ -66,11 +66,7 @@ const SrtFileCard = ({ audioFile, onUpdate, onDelete }: SrtFileCardProps) => {
       return;
     }
 
-    if (audioFile.settings.enableAdvancedProcessing) {
-      await startAdvancedTranscription(apiKey);
-    } else {
-      await startBasicTranscription(apiKey);
-    }
+    await startBasicTranscription(apiKey);
   };
 
   const startBasicTranscription = async (apiKey: string) => {
@@ -133,201 +129,6 @@ const SrtFileCard = ({ audioFile, onUpdate, onDelete }: SrtFileCardProps) => {
     }
   };
 
-  const startAdvancedTranscription = async (apiKey: string) => {
-    onUpdate(audioFile.id, {
-      status: 'processing',
-      error: undefined,
-      progress: 'ステップ 1/6: ファイルを一時保存中...',
-      stages: {
-        initialTranscription: {
-          name: '基本文字起こし (Gemini 2.0 Flash)',
-          status: 'pending',
-        },
-        topicAnalysis: {
-          name: 'トピック分析 (Gemini 2.0 Flash)',
-          status: 'pending',
-        },
-        dictionaryCreation: {
-          name: '辞書作成 (Google検索+Gemini 2.0 Flash)',
-          status: 'pending',
-        },
-        finalTranscription: {
-          name: '最終字幕生成 (Gemini 2.5 Pro)',
-          status: 'pending',
-        },
-      },
-    });
-
-    try {
-      const tempFilePath = await saveFileTemporarily(audioFile.file);
-
-      // ステップ1: 基本文字起こし（音声ファイルを使用）
-      onUpdate(audioFile.id, {
-        progress: 'ステップ 2/6: 基本文字起こし中... (Gemini 2.0 Flash)',
-        stages: {
-          ...audioFile.stages,
-          initialTranscription: {
-            name: '基本文字起こし (Gemini 2.0 Flash)',
-            status: 'processing',
-          },
-        },
-      });
-
-      const initialPrompt = INITIAL_TRANSCRIPTION_PROMPT();
-      const initialResult = await invoke<string>('transcribe_audio', {
-        filePath: tempFilePath,
-        prompt: initialPrompt,
-        model: 'gemini-2.0-flash',
-        apiKey,
-      });
-
-      onUpdate(audioFile.id, {
-        stages: {
-          ...audioFile.stages,
-          initialTranscription: {
-            name: '基本文字起こし (Gemini 2.0 Flash)',
-            status: 'completed',
-            result: initialResult,
-          },
-        },
-      });
-
-      // ステップ2: トピック分析（テキストベース処理）
-      onUpdate(audioFile.id, {
-        progress: 'ステップ 3/6: 会話トピック分析中... (Gemini 2.0 Flash)',
-        stages: {
-          ...audioFile.stages,
-          topicAnalysis: {
-            name: 'トピック分析 (Gemini 2.0 Flash)',
-            status: 'processing',
-          },
-        },
-      });
-
-      const topicResult = await invoke<string>('analyze_topic', {
-        transcription: initialResult,
-        apiKey,
-      });
-
-      onUpdate(audioFile.id, {
-        analyzedTopic: topicResult,
-        stages: {
-          ...audioFile.stages,
-          topicAnalysis: {
-            name: 'トピック分析 (Gemini 2.0 Flash)',
-            status: 'completed',
-            result: topicResult,
-          },
-        },
-      });
-
-      // ステップ3: 辞書作成（テキストベース処理）
-      // トピックから主要テーマを抽出
-      const topicLine = topicResult
-        .split('\n')
-        .find((line) => line.includes('メイントピック:'));
-      const mainTopic = topicLine
-        ? topicLine.replace('メイントピック:', '').trim()
-        : 'この会話';
-
-      onUpdate(audioFile.id, {
-        progress: `ステップ 4/6: ${mainTopic}に関する用語集を生成中... (Google検索+Gemini 2.0 Flash)`,
-        stages: {
-          ...audioFile.stages,
-          dictionaryCreation: {
-            name: `用語集作成: ${mainTopic} (Google検索+Gemini 2.0 Flash)`,
-            status: 'processing',
-          },
-        },
-      });
-
-      let dictionary = '';
-      if (audioFile.settings.customDictionaryPath) {
-        // カスタム辞書を読み込み
-        dictionary = await invoke<string>('load_dictionary_csv', {
-          filePath: audioFile.settings.customDictionaryPath,
-        });
-      } else {
-        // 自動生成
-        dictionary = await invoke<string>('create_dictionary', {
-          topic: topicResult,
-          apiKey,
-        });
-
-        // 生成した辞書をエクスポート
-        const baseName = audioFile.file.name.replace(/\.[^/.]+$/, '');
-        const savedPath = await invoke<string>('save_dictionary_csv', {
-          content: dictionary,
-          suggestedFilename: `${baseName}_dictionary.csv`,
-        });
-        console.log('Dictionary saved to:', savedPath);
-      }
-
-      onUpdate(audioFile.id, {
-        dictionary,
-        stages: {
-          ...audioFile.stages,
-          dictionaryCreation: {
-            name: `用語集作成: ${mainTopic} (Google検索+Gemini 2.0 Flash) - CSV保存済み`,
-            status: 'completed',
-            result: dictionary,
-          },
-        },
-      });
-
-      // ステップ4: 最終SRT生成（辞書付きテキスト変換）
-      onUpdate(audioFile.id, {
-        progress: 'ステップ 5/6: 高精度SRT字幕生成中... (Gemini 2.5 Pro)',
-        stages: {
-          ...audioFile.stages,
-          finalTranscription: {
-            name: '最終字幕生成 (Gemini 2.5 Pro)',
-            status: 'processing',
-          },
-        },
-      });
-
-      // 文字起こし結果を辞書を使ってSRT形式に変換
-      const finalResult = await invoke<string>(
-        'enhance_transcription_with_dictionary',
-        {
-          initialTranscription: initialResult,
-          dictionary: dictionary,
-          maxCharsPerSubtitle: audioFile.settings.maxCharsPerSubtitle,
-          enableSpeakerDetection: audioFile.settings.enableSpeakerDetection,
-          apiKey,
-        }
-      );
-
-      onUpdate(audioFile.id, { progress: 'ステップ 6/6: SRT形式の検証中...' });
-
-      // Parse and validate SRT
-      const subtitles = parseSrt(finalResult);
-      const validation = validateSrt(finalResult);
-
-      onUpdate(audioFile.id, {
-        status: 'completed',
-        result: finalResult,
-        subtitles: validation.isValid ? subtitles : undefined,
-        progress: undefined,
-        srtValidation: validation,
-        stages: {
-          ...audioFile.stages,
-          finalTranscription: {
-            name: '最終字幕生成 (Gemini 2.5 Pro)',
-            status: 'completed',
-            result: finalResult,
-          },
-        },
-      });
-    } catch (error) {
-      onUpdate(audioFile.id, {
-        status: 'error',
-        error: `高度処理でエラーが発生しました: ${error}`,
-        progress: undefined,
-      });
-    }
-  };
 
   const retryTranscription = () => {
     startTranscription();
@@ -375,38 +176,6 @@ const SrtFileCard = ({ audioFile, onUpdate, onDelete }: SrtFileCardProps) => {
     }
   };
 
-  const downloadDictionary = async () => {
-    if (!audioFile.dictionary) {
-      toast({
-        variant: 'destructive',
-        title: 'ダウンロードエラー',
-        description: 'ダウンロードできる辞書がありません',
-      });
-      return;
-    }
-
-    const baseName = audioFile.file.name.replace(/\.[^/.]+$/, '');
-    const filename = `${baseName}_dictionary.csv`;
-
-    try {
-      await invoke<string>('save_dictionary_csv', {
-        content: audioFile.dictionary,
-        suggestedFilename: filename,
-      });
-      toast({
-        variant: 'success',
-        title: 'ダウンロード完了',
-        description: `辞書CSV (${filename}) をダウンロードしました`,
-      });
-    } catch (error) {
-      console.error('Dictionary download failed:', error);
-      toast({
-        variant: 'destructive',
-        title: 'ダウンロードエラー',
-        description: '辞書のダウンロードに失敗しました',
-      });
-    }
-  };
 
   const updateSettings = (key: keyof SrtSettings, value: any) => {
     onUpdate(audioFile.id, {
@@ -505,11 +274,6 @@ const SrtFileCard = ({ audioFile, onUpdate, onDelete }: SrtFileCardProps) => {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium">生成進行状況</span>
-              <span className="text-xs text-muted-foreground">
-                {audioFile.settings.enableAdvancedProcessing
-                  ? '高精度モード'
-                  : '標準モード'}
-              </span>
             </div>
             <Progress value={undefined} className="h-3" />
             <div className="flex items-center gap-2">
@@ -610,41 +374,6 @@ const SrtFileCard = ({ audioFile, onUpdate, onDelete }: SrtFileCardProps) => {
               </Select>
             </div>
 
-            <div className="md:col-span-2 space-y-2">
-              <label className="text-sm font-medium">
-                処理モード
-                <span className="text-xs text-muted-foreground ml-2">
-                  (現在:{' '}
-                  {audioFile.settings.enableAdvancedProcessing
-                    ? '高精度モード'
-                    : '標準モード'}
-                  )
-                </span>
-              </label>
-              <Select
-                value={
-                  audioFile.settings.enableAdvancedProcessing ? 'true' : 'false'
-                }
-                onValueChange={(value) =>
-                  updateSettings('enableAdvancedProcessing', value === 'true')
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="false">標準モード - 高速処理</SelectItem>
-                  <SelectItem value="true">
-                    高精度モード - トピック分析＋専門用語辞書
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-              {audioFile.settings.enableAdvancedProcessing && (
-                <p className="text-xs text-muted-foreground">
-                  高精度モードでは、文字起こし→トピック分析→Google検索で正確性を確認した辞書作成→最終生成の4段階処理を行います
-                </p>
-              )}
-            </div>
           </div>
         )}
 
@@ -668,29 +397,16 @@ const SrtFileCard = ({ audioFile, onUpdate, onDelete }: SrtFileCardProps) => {
                   ? 'テキストダウンロード (.srt)'
                   : 'SRTダウンロード'}
               </Button>
-              {audioFile.settings.enableAdvancedProcessing &&
-                audioFile.dictionary && (
-                  <Button
-                    onClick={downloadDictionary}
-                    variant="outline"
-                    className="flex items-center gap-2"
-                  >
-                    <Download className="h-4 w-4" />
-                    辞書CSVダウンロード
-                  </Button>
-                )}
-              {!audioFile.settings.enableAdvancedProcessing && (
-                <Button
-                  onClick={() => setShowGeminiDebug(!showGeminiDebug)}
-                  variant="ghost"
-                  className="flex items-center gap-2"
-                >
-                  <FileText className="h-4 w-4" />
-                  {showGeminiDebug
-                    ? 'Geminiデバッグを隠す'
-                    : 'Geminiデバッグを表示'}
-                </Button>
-              )}
+              <Button
+                onClick={() => setShowGeminiDebug(!showGeminiDebug)}
+                variant="ghost"
+                className="flex items-center gap-2"
+              >
+                <FileText className="h-4 w-4" />
+                {showGeminiDebug
+                  ? 'Geminiデバッグを隠す'
+                  : 'Geminiデバッグを表示'}
+              </Button>
               <Button
                 onClick={retryTranscription}
                 variant="outline"
@@ -754,347 +470,10 @@ const SrtFileCard = ({ audioFile, onUpdate, onDelete }: SrtFileCardProps) => {
           </div>
         )}
 
-        {/* GitHub Actions Style Processing Steps */}
-        {audioFile.settings.enableAdvancedProcessing &&
-          (audioFile.status === 'processing' ||
-            audioFile.status === 'completed' ||
-            audioFile.status === 'error') && (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h4 className="font-medium">処理ステップ (4段階)</h4>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  {audioFile.status === 'completed' && (
-                    <>
-                      <CheckCircle className="h-4 w-4 text-green-500" />
-                      すべて完了
-                    </>
-                  )}
-                  {audioFile.status === 'processing' && (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
-                      処理中
-                    </>
-                  )}
-                </div>
-              </div>
 
-              <div className="border rounded-lg bg-card overflow-hidden">
-                {(() => {
-                  // デフォルトのステップ定義
-                  const defaultStages = {
-                    initialTranscription: {
-                      name: '基本文字起こし (Gemini 2.0 Flash)',
-                      status: 'pending' as const,
-                      description:
-                        '音声ファイルから基本的な文字起こしを行います',
-                    },
-                    topicAnalysis: {
-                      name: 'トピック分析 (Gemini 2.0 Flash)',
-                      status: 'pending' as const,
-                      description:
-                        '文字起こし結果からトピックと主要テーマを分析します',
-                    },
-                    dictionaryCreation: {
-                      name: '辞書作成 (Google検索+Gemini 2.0 Flash)',
-                      status: 'pending' as const,
-                      description:
-                        'トピックに関連する専門用語辞書をGoogle検索で作成します',
-                    },
-                    finalTranscription: {
-                      name: '最終字幕生成 (Gemini 2.5 Pro)',
-                      status: 'pending' as const,
-                      description: '辞書を使用して高精度なSRT字幕を生成します',
-                    },
-                  };
-
-                  // 実際のステージと統合（実際のデータを優先）
-                  const stages = audioFile.stages
-                    ? Object.fromEntries(
-                        Object.entries(defaultStages).map(
-                          ([key, defaultStage]) => {
-                            const stageKey =
-                              key as keyof typeof audioFile.stages;
-                            return [
-                              key,
-                              audioFile.stages?.[stageKey]
-                                ? {
-                                    ...audioFile.stages[stageKey],
-                                    description: defaultStage.description,
-                                  }
-                                : defaultStage,
-                            ];
-                          }
-                        )
-                      )
-                    : defaultStages;
-
-                  return Object.entries(stages).map(([key, stage], index) => {
-                    const isExpanded =
-                      stage.status === 'completed' || stage.status === 'error';
-
-                    // ステップがスキップされたかどうかを判定
-                    // 実際のステージデータが存在しない かつ 後続のステップが完了している場合のみスキップ
-                    const stageKeys = Object.keys(stages);
-                    const currentIndex = stageKeys.indexOf(key);
-                    const hasActualStageData = audioFile.stages?.[key as keyof typeof audioFile.stages];
-                    
-                    // データがある場合は絶対にスキップではない（statusに関係なく）
-                    // データがない場合のみスキップ判定を行う
-                    const isLikelySkipped =
-                      !hasActualStageData &&
-                      stage.status === 'pending' &&
-                      audioFile.stages &&
-                      stageKeys.slice(currentIndex + 1).some((laterKey) => {
-                        const laterStage =
-                          audioFile.stages?.[
-                            laterKey as keyof typeof audioFile.stages
-                          ];
-                        return laterStage && laterStage.status === 'completed';
-                      });
-
-                    // デバッグ用: ステージの実際の状態をログ出力
-                    if (
-                      audioFile.stages &&
-                      process.env.NODE_ENV === 'development'
-                    ) {
-                      console.log(`Stage ${key}:`, {
-                        actual:
-                          audioFile.stages[
-                            key as keyof typeof audioFile.stages
-                          ],
-                        merged: stage,
-                        hasActualStageData,
-                        isLikelySkipped,
-                      });
-                    }
-
-                    return (
-                      <div
-                        key={key}
-                        id={`stage-detail-${key}`}
-                        className={`border-b last:border-b-0 ${
-                          stage.status === 'completed'
-                            ? 'bg-green-50/30'
-                            : stage.status === 'error'
-                              ? 'bg-red-50/30'
-                              : stage.status === 'processing'
-                                ? 'bg-blue-50/30'
-                                : 'bg-gray-50/30'
-                        }`}
-                      >
-                        <details className="group" open={isExpanded}>
-                          <summary className="cursor-pointer list-none">
-                            <div className="p-4 hover:bg-muted/20 flex items-center gap-3">
-                              <div className="flex items-center gap-3 flex-1">
-                                {/* Step Icon */}
-                                <div className="flex-shrink-0">
-                                  {stage.status === 'completed' && (
-                                    <CheckCircle className="h-5 w-5 text-green-500" />
-                                  )}
-                                  {stage.status === 'processing' && (
-                                    <Loader2 className="h-5 w-5 animate-spin text-blue-500" />
-                                  )}
-                                  {stage.status === 'pending' && (
-                                    <div className="h-5 w-5 rounded-full border-2 border-gray-300" />
-                                  )}
-                                  {stage.status === 'error' && (
-                                    <AlertCircle className="h-5 w-5 text-red-500" />
-                                  )}
-                                </div>
-
-                                {/* Step Info */}
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center justify-between">
-                                    <span className="font-medium text-sm truncate">
-                                      {stage.name}
-                                    </span>
-                                    <div className="flex items-center gap-2 ml-4">
-                                      {stage.status === 'completed' && (
-                                        <span className="text-xs text-green-600 font-medium">
-                                          完了
-                                        </span>
-                                      )}
-                                      {stage.status === 'processing' && (
-                                        <span className="text-xs text-blue-600 font-medium">
-                                          実行中
-                                        </span>
-                                      )}
-                                      {stage.status === 'error' && (
-                                        <span className="text-xs text-red-600 font-medium">
-                                          エラー
-                                        </span>
-                                      )}
-                                      <span className="text-xs text-muted-foreground">
-                                        {index + 1}/4
-                                      </span>
-                                    </div>
-                                  </div>
-                                </div>
-
-                                {/* Expand Icon - Hidden */}
-                              </div>
-                            </div>
-                          </summary>
-
-                          {/* Step Content */}
-                          <div className="border-t bg-background/50">
-                            <div className="p-4 pl-12">
-                              {stage.status === 'completed' && stage.result && (
-                                <div className="space-y-3">
-                                  <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                      <CheckCircle className="h-4 w-4 text-green-500" />
-                                      <span className="text-sm font-medium text-green-700">
-                                        このステップは正常に完了しました
-                                      </span>
-                                    </div>
-                                    <button
-                                      onClick={() =>
-                                        navigator.clipboard.writeText(
-                                          stage.result!
-                                        )
-                                      }
-                                      className="text-xs px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-                                    >
-                                      レスポンスをコピー
-                                    </button>
-                                  </div>
-
-                                  <div className="bg-gray-950 text-gray-100 p-4 rounded-lg max-h-96 overflow-y-auto border">
-                                    <div className="text-xs text-gray-400 mb-2 font-mono">
-                                      {key === 'initialTranscription' &&
-                                        'Gemini 2.0 Flash - 基本文字起こしレスポンス:'}
-                                      {key === 'topicAnalysis' &&
-                                        'Gemini 2.0 Flash - トピック分析レスポンス:'}
-                                      {key === 'dictionaryCreation' &&
-                                        'Gemini 2.0 Flash + Google検索 - 辞書作成レスポンス:'}
-                                      {key === 'finalTranscription' &&
-                                        'Gemini 2.5 Pro - 最終SRT生成レスポンス:'}
-                                    </div>
-                                    <pre className="text-sm whitespace-pre-wrap font-mono leading-relaxed">
-                                      {stage.result}
-                                    </pre>
-                                  </div>
-
-                                  {/* 特定のステップに応じた追加情報 */}
-                                  {key === 'topicAnalysis' && (
-                                    <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg">
-                                      <div className="text-xs font-medium text-blue-700 mb-1">
-                                        分析結果:
-                                      </div>
-                                      <div className="text-sm text-blue-600">
-                                        このトピック分析結果を基に、次のステップで専門用語辞書が作成されます
-                                      </div>
-                                    </div>
-                                  )}
-
-                                  {key === 'dictionaryCreation' &&
-                                    audioFile.dictionary && (
-                                      <div className="bg-green-50 border border-green-200 p-3 rounded-lg">
-                                        <div className="text-xs font-medium text-green-700 mb-1">
-                                          生成された辞書:
-                                        </div>
-                                        <div className="text-sm text-green-600">
-                                          この辞書は最終的なSRT生成で専門用語の正確性向上に使用されます
-                                        </div>
-                                        <div className="mt-2 bg-white border p-2 rounded text-xs font-mono max-h-32 overflow-y-auto">
-                                          {audioFile.dictionary}
-                                        </div>
-                                      </div>
-                                    )}
-
-                                  {key === 'initialTranscription' && (
-                                    <div className="bg-yellow-50 border border-yellow-200 p-3 rounded-lg">
-                                      <div className="text-xs font-medium text-yellow-700 mb-1">
-                                        次のステップ:
-                                      </div>
-                                      <div className="text-sm text-yellow-600">
-                                        この基本文字起こし結果を基にトピック分析が実行されます
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-
-                              {stage.status === 'processing' && (
-                                <div className="space-y-3">
-                                  <div className="flex items-center gap-3 text-blue-600">
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                    <span className="text-sm">
-                                      このステップを実行中です...
-                                    </span>
-                                  </div>
-                                  {stage.description && (
-                                    <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg">
-                                      <div className="text-xs font-medium text-blue-700 mb-1">
-                                        実行中の処理:
-                                      </div>
-                                      <div className="text-sm text-blue-600">
-                                        {stage.description}
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-
-                              {stage.status === 'error' && stage.error && (
-                                <div className="space-y-3">
-                                  <div className="flex items-center gap-2">
-                                    <AlertCircle className="h-4 w-4 text-red-500" />
-                                    <span className="text-sm font-medium text-red-700">
-                                      このステップでエラーが発生しました
-                                    </span>
-                                  </div>
-                                  <div className="bg-red-50 border border-red-200 text-red-800 p-4 rounded-lg">
-                                    <pre className="text-sm whitespace-pre-wrap">
-                                      {stage.error}
-                                    </pre>
-                                  </div>
-                                </div>
-                              )}
-
-                              {stage.status === 'pending' && (
-                                <div className="space-y-3">
-                                  <div className="flex items-center gap-3 text-gray-500">
-                                    <div className="h-4 w-4 rounded-full border-2 border-gray-300" />
-                                    <span className="text-sm">
-                                      {isLikelySkipped
-                                        ? 'このステップはスキップされました'
-                                        : 'このステップは待機中です...'}
-                                    </span>
-                                  </div>
-                                  {stage.description && (
-                                    <div className="bg-gray-50 border border-gray-200 p-3 rounded-lg">
-                                      <div className="text-xs font-medium text-gray-700 mb-1">
-                                        {isLikelySkipped ? "スキップされたステップ:" : "ステップ概要:"}
-                                      </div>
-                                      <div className="text-sm text-gray-600">
-                                        {stage.description}
-                                        {isLikelySkipped && (
-                                          <div className="mt-2 text-xs text-gray-500">
-                                            このステップはスキップされ、後続のステップが直接実行されました。
-                                          </div>
-                                        )}
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </details>
-                      </div>
-                    );
-                  });
-                })()}
-              </div>
-            </div>
-          )}
-
-        {/* Gemini Debug Section (for standard mode) */}
+        {/* Gemini Debug Section */}
         {audioFile.status === 'completed' &&
           showGeminiDebug &&
-          !audioFile.settings.enableAdvancedProcessing &&
           audioFile.result && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">

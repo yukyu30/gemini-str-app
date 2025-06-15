@@ -1,6 +1,5 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { vi, describe, it, expect, beforeEach } from 'vitest'
-import { invoke } from '@tauri-apps/api/core'
 import SrtFileCard from './SrtFileCard'
 import { useToast } from '@/hooks/use-toast'
 import * as srtUtils from '@/lib/srt-utils'
@@ -27,7 +26,6 @@ vi.mock('@/utils/storage', () => ({
   }
 }))
 
-const mockInvoke = vi.mocked(invoke)
 const mockUseToast = vi.mocked(useToast)
 const mockDownloadSrtFile = vi.mocked(srtUtils.downloadSrtFile)
 
@@ -42,8 +40,7 @@ describe('SrtFileCard', () => {
     settings: {
       maxCharsPerSubtitle: 20,
       enableSpeakerDetection: false,
-      removeFillerWords: true,
-      enableAdvancedProcessing: false
+      removeFillerWords: true
     },
     status: 'idle'
   }
@@ -136,283 +133,48 @@ describe('SrtFileCard', () => {
     })
   })
 
-  describe('Processing Steps Display', () => {
-    it('should display processing steps when advanced processing is enabled', () => {
-      const advancedAudioFile = {
+
+  describe('Processing Steps Deletion', () => {
+    it('should not display processing steps UI elements', () => {
+      const audioFile = {
         ...mockAudioFile,
-        settings: {
-          ...mockAudioFile.settings,
-          enableAdvancedProcessing: true
-        },
-        status: 'processing' as const,
-        stages: {
-          initialTranscription: {
-            name: '基本文字起こし (Gemini 2.0 Flash)',
-            status: 'processing' as const
-          }
-        }
-      }
-
-      render(
-        <SrtFileCard 
-          audioFile={advancedAudioFile}
-          onUpdate={mockOnUpdate}
-          onDelete={mockOnDelete}
-        />
-      )
-
-      expect(screen.getByText('処理ステップ (4段階)')).toBeInTheDocument()
-      expect(screen.getByText('基本文字起こし (Gemini 2.0 Flash)')).toBeInTheDocument()
-    })
-
-    it('should show all 4 default stages when no actual stages exist', () => {
-      const advancedAudioFile = {
-        ...mockAudioFile,
-        settings: {
-          ...mockAudioFile.settings,
-          enableAdvancedProcessing: true
-        },
         status: 'processing' as const
       }
 
       render(
         <SrtFileCard 
-          audioFile={advancedAudioFile}
+          audioFile={audioFile}
           onUpdate={mockOnUpdate}
           onDelete={mockOnDelete}
         />
       )
 
-      expect(screen.getByText('処理ステップ (4段階)')).toBeInTheDocument()
-      expect(screen.getByText('基本文字起こし (Gemini 2.0 Flash)')).toBeInTheDocument()
-      expect(screen.getByText('トピック分析 (Gemini 2.0 Flash)')).toBeInTheDocument()
-      expect(screen.getByText('辞書作成 (Google検索+Gemini 2.0 Flash)')).toBeInTheDocument()
-      expect(screen.getByText('最終字幕生成 (Gemini 2.5 Pro)')).toBeInTheDocument()
-    })
-
-    it('should merge actual stage data with default stage data correctly', () => {
-      const advancedAudioFile = {
-        ...mockAudioFile,
-        settings: {
-          ...mockAudioFile.settings,
-          enableAdvancedProcessing: true
-        },
-        status: 'completed' as const,
-        stages: {
-          initialTranscription: {
-            name: '基本文字起こし (Gemini 2.0 Flash)',
-            status: 'completed' as const,
-            result: 'Transcription result here'
-          },
-          topicAnalysis: {
-            name: 'トピック分析 (Gemini 2.0 Flash)',
-            status: 'completed' as const,
-            result: 'Topic analysis result here'
-          }
-        }
-      }
-
-      render(
-        <SrtFileCard 
-          audioFile={advancedAudioFile}
-          onUpdate={mockOnUpdate}
-          onDelete={mockOnDelete}
-        />
-      )
-
-      // Check that completed stages show correct status
-      // Note: There might be additional "完了" text in status badges and other places
-      expect(screen.getByText('基本文字起こし (Gemini 2.0 Flash)')).toBeInTheDocument()
-      expect(screen.getByText('トピック分析 (Gemini 2.0 Flash)')).toBeInTheDocument()
-    })
-
-    it('should NOT show skipped message for actually executed dictionary step', () => {
-      // This test reproduces the exact user scenario:
-      // Dictionary step is executed but shows as "skipped"
-      const advancedAudioFile = {
-        ...mockAudioFile,
-        settings: {
-          ...mockAudioFile.settings,
-          enableAdvancedProcessing: true
-        },
-        status: 'completed' as const,
-        stages: {
-          initialTranscription: {
-            name: '基本文字起こし (Gemini 2.0 Flash)',
-            status: 'completed' as const,
-            result: 'Initial transcription result'
-          },
-          topicAnalysis: {
-            name: 'トピック分析 (Gemini 2.0 Flash)',
-            status: 'completed' as const,
-            result: 'Topic analysis result'
-          },
-          dictionaryCreation: {
-            name: '辞書作成 (Google検索+Gemini 2.0 Flash)',
-            status: 'completed' as const,
-            result: 'Dictionary creation completed'
-          },
-          finalTranscription: {
-            name: '最終字幕生成 (Gemini 2.5 Pro)',
-            status: 'completed' as const,
-            result: 'Final SRT result'
-          }
-        }
-      }
-
-      render(
-        <SrtFileCard 
-          audioFile={advancedAudioFile}
-          onUpdate={mockOnUpdate}
-          onDelete={mockOnDelete}
-        />
-      )
-
-      // Dictionary step should NOT show "skipped" message
-      expect(screen.queryByText('このステップはスキップされました')).not.toBeInTheDocument()
-      
-      // Dictionary step should show completion status
-      expect(screen.getByText('辞書作成 (Google検索+Gemini 2.0 Flash)')).toBeInTheDocument()
-      
-      // Should be able to find completion indicators
-      const completionTexts = screen.getAllByText('完了')
-      expect(completionTexts.length).toBeGreaterThan(0)
-    })
-
-    it('should reproduce user scenario - dictionary step showing as skipped despite being executed', () => {
-      // Trying to reproduce the exact issue the user is experiencing
-      // Perhaps the issue is in how stages are merged when they have different status values
-      const advancedAudioFile = {
-        ...mockAudioFile,
-        settings: {
-          ...mockAudioFile.settings,
-          enableAdvancedProcessing: true
-        },
-        status: 'completed' as const,
-        stages: {
-          // All stages have actual data (this mimics real execution)
-          initialTranscription: {
-            name: '基本文字起こし (Gemini 2.0 Flash)',
-            status: 'completed' as const,
-            result: 'Initial transcription result'
-          },
-          topicAnalysis: {
-            name: 'トピック分析 (Gemini 2.0 Flash)',
-            status: 'completed' as const,
-            result: 'Topic analysis result'
-          },
-          // Dictionary step has data but wrong status - this is the user's problem
-          dictionaryCreation: {
-            name: '辞書作成 (Google検索+Gemini 2.0 Flash)',
-            status: 'pending' as const, // This could be the problem
-            result: 'Dictionary was actually created' // But it has result data
-          },
-          finalTranscription: {
-            name: '最終字幕生成 (Gemini 2.5 Pro)',
-            status: 'completed' as const,
-            result: 'Final SRT result'
-          }
-        }
-      }
-
-      render(
-        <SrtFileCard 
-          audioFile={advancedAudioFile}
-          onUpdate={mockOnUpdate}
-          onDelete={mockOnDelete}
-        />
-      )
-
-      // This test should FAIL if our logic is wrong
-      // If dictionary step has data but status is 'pending', 
-      // it should NOT be marked as skipped
-      expect(screen.queryByText('このステップはスキップされました')).not.toBeInTheDocument()
-    })
-
-    it('should display step descriptions for pending stages', () => {
-      const advancedAudioFile = {
-        ...mockAudioFile,
-        settings: {
-          ...mockAudioFile.settings,
-          enableAdvancedProcessing: true
-        },
-        status: 'processing' as const
-      }
-
-      render(
-        <SrtFileCard 
-          audioFile={advancedAudioFile}
-          onUpdate={mockOnUpdate}
-          onDelete={mockOnDelete}
-        />
-      )
-
-      // Click on a pending stage to expand it
-      const firstStage = screen.getByText('基本文字起こし (Gemini 2.0 Flash)')
-      fireEvent.click(firstStage)
-
-      expect(screen.getByText('音声ファイルから基本的な文字起こしを行います')).toBeInTheDocument()
+      expect(screen.queryByText('処理ステップ (4段階)')).not.toBeInTheDocument()
+      expect(screen.queryByText('基本文字起こし (Gemini 2.0 Flash)')).not.toBeInTheDocument()
+      expect(screen.queryByText('トピック分析 (Gemini 2.0 Flash)')).not.toBeInTheDocument()
+      expect(screen.queryByText('辞書作成 (Google検索+Gemini 2.0 Flash)')).not.toBeInTheDocument()
+      expect(screen.queryByText('最終字幕生成 (Gemini 2.5 Pro)')).not.toBeInTheDocument()
     })
   })
 
   describe('Dictionary Download', () => {
-    it('should not show dictionary download button when no dictionary exists', () => {
-      const audioFileWithoutDictionary = {
+    it('should not show dictionary download button as feature was removed', () => {
+      const audioFileWithResult = {
         ...mockAudioFile,
         status: 'completed' as const,
-        settings: {
-          ...mockAudioFile.settings,
-          enableAdvancedProcessing: true
-        },
-        result: 'Some result', // Need result to show download buttons
-        stages: {
-          initialTranscription: { name: 'test', status: 'completed' as const }
-        }
+        result: 'Some result'
       }
 
       render(
         <SrtFileCard 
-          audioFile={audioFileWithoutDictionary}
+          audioFile={audioFileWithResult}
           onUpdate={mockOnUpdate}
           onDelete={mockOnDelete}
         />
       )
 
-      // Should not find dictionary download button when no dictionary exists
+      // Should not find dictionary download button as feature was removed
       expect(screen.queryByRole('button', { name: /辞書CSVダウンロード/ })).not.toBeInTheDocument()
-    })
-
-    it('should show success toast when dictionary download succeeds', async () => {
-      const audioFileWithDictionary = {
-        ...mockAudioFile,
-        status: 'completed' as const,
-        settings: {
-          ...mockAudioFile.settings,
-          enableAdvancedProcessing: true
-        },
-        dictionary: 'test,dictionary,csv,content'
-      }
-
-      mockInvoke.mockResolvedValueOnce('/path/to/dictionary.csv')
-
-      render(
-        <SrtFileCard 
-          audioFile={audioFileWithDictionary}
-          onUpdate={mockOnUpdate}
-          onDelete={mockOnDelete}
-        />
-      )
-
-      const downloadButton = screen.getByRole('button', { name: /辞書CSVダウンロード/ })
-      fireEvent.click(downloadButton)
-
-      await waitFor(() => {
-        expect(mockToast).toHaveBeenCalledWith({
-          variant: 'success',
-          title: 'ダウンロード完了',
-          description: expect.stringContaining('辞書CSV')
-        })
-      })
     })
   })
 })
