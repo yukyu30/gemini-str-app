@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { AlertCircle, FileAudio, Settings as SettingsIcon } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { AlertCircle, FileAudio, Settings as SettingsIcon, Save, RotateCcw } from 'lucide-react'
 
 import SrtDropZone from './SrtDropZone'
 import SrtFileCard from './SrtFileCard'
@@ -10,12 +10,20 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 
 import { AudioFile, DEFAULT_SRT_SETTINGS, SrtSettings } from '@/types/srt'
 import { GEMINI_MODELS } from '@/constants/prompts'
+import { settingsStorage } from '@/lib/settings-storage'
 
 const SrtTranscription = () => {
   const [audioFiles, setAudioFiles] = useState<AudioFile[]>([])
   const [globalError, setGlobalError] = useState('')
   const [globalSettings, setGlobalSettings] = useState<SrtSettings>(DEFAULT_SRT_SETTINGS)
+  const [settingsSaved, setSettingsSaved] = useState(false)
   const [showGlobalSettings, setShowGlobalSettings] = useState(false)
+
+  // Load default settings on component mount
+  useEffect(() => {
+    const savedSettings = settingsStorage.loadDefaultSettings()
+    setGlobalSettings(savedSettings)
+  }, [])
 
   const handleFilesAdded = (files: File[]) => {
     const newAudioFiles = files.map(file => ({
@@ -89,6 +97,19 @@ const SrtTranscription = () => {
 
   const updateGlobalSetting = (key: keyof SrtSettings, value: any) => {
     setGlobalSettings(prev => ({ ...prev, [key]: value }))
+    setSettingsSaved(false) // Mark as unsaved when settings change
+  }
+
+  const saveDefaultSettings = () => {
+    settingsStorage.saveDefaultSettings(globalSettings)
+    setSettingsSaved(true)
+    setTimeout(() => setSettingsSaved(false), 2000) // Reset after 2 seconds
+  }
+
+  const resetDefaultSettings = () => {
+    const defaults = settingsStorage.resetToDefaults()
+    setGlobalSettings(defaults)
+    setSettingsSaved(false)
   }
 
   const statusCounts = getStatusCounts()
@@ -201,7 +222,12 @@ const SrtTranscription = () => {
                     </div>
 
                     <div className="space-y-2">
-                      <label className="text-sm font-medium">話者識別</label>
+                      <label className="text-sm font-medium">
+                        話者識別 
+                        <span className="text-xs text-muted-foreground">
+                          (現在: {globalSettings.enableSpeakerDetection ? '有効' : '無効'})
+                        </span>
+                      </label>
                       <Select 
                         value={globalSettings.enableSpeakerDetection ? 'true' : 'false'}
                         onValueChange={(value) => updateGlobalSetting('enableSpeakerDetection', value === 'true')}
@@ -210,8 +236,8 @@ const SrtTranscription = () => {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="true">有効</SelectItem>
-                          <SelectItem value="false">無効</SelectItem>
+                          <SelectItem value="true">有効 - 話者名を追加</SelectItem>
+                          <SelectItem value="false">無効 - 純粋な発話内容のみ</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -223,6 +249,22 @@ const SrtTranscription = () => {
                         className="flex-1"
                       >
                         全ファイルに設定を適用
+                      </Button>
+                      <Button
+                        onClick={saveDefaultSettings}
+                        className="flex items-center gap-2"
+                        disabled={settingsSaved}
+                      >
+                        <Save className="h-4 w-4" />
+                        {settingsSaved ? '保存済み' : 'デフォルトとして保存'}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={resetDefaultSettings}
+                        className="flex items-center gap-2"
+                      >
+                        <RotateCcw className="h-4 w-4" />
+                        初期設定に戻す
                       </Button>
                     </div>
                   </div>

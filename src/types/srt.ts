@@ -25,7 +25,7 @@ export interface AudioFile {
 
 export const DEFAULT_SRT_SETTINGS: SrtSettings = {
   maxCharsPerSubtitle: 20,
-  enableSpeakerDetection: true,
+  enableSpeakerDetection: false, // デフォルトを false に変更
   removeFillerWords: true,
   model: 'gemini-2.0-flash'
 }

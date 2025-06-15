@@ -69,11 +69,21 @@ const SrtFileCard = ({ audioFile, onUpdate, onDelete }: SrtFileCardProps) => {
       
       onUpdate(audioFile.id, { progress: 'SRT字幕を生成中...' })
       
+      console.log('Transcription settings:', {
+        maxCharsPerSubtitle: audioFile.settings.maxCharsPerSubtitle,
+        enableSpeakerDetection: audioFile.settings.enableSpeakerDetection,
+        model: audioFile.settings.model
+      })
+      
       const prompt = SRT_PROMPT(
         undefined,
         audioFile.settings.maxCharsPerSubtitle,
         audioFile.settings.enableSpeakerDetection
       )
+      
+      console.log('Generated prompt contains speaker detection:', 
+        prompt.includes('話者名を明記') ? 'YES' : 'NO')
+      console.log('Prompt preview:', prompt.substring(0, 500) + '...')
       
       const result = await invoke<string>('transcribe_audio', {
         filePath: tempFilePath,
@@ -274,7 +284,12 @@ const SrtFileCard = ({ audioFile, onUpdate, onDelete }: SrtFileCardProps) => {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">話者識別</label>
+              <label className="text-sm font-medium">
+                話者識別
+                <span className="text-xs text-muted-foreground ml-2">
+                  (現在: {audioFile.settings.enableSpeakerDetection ? '有効' : '無効'})
+                </span>
+              </label>
               <Select 
                 value={audioFile.settings.enableSpeakerDetection ? 'true' : 'false'}
                 onValueChange={(value) => updateSettings('enableSpeakerDetection', value === 'true')}
@@ -283,8 +298,8 @@ const SrtFileCard = ({ audioFile, onUpdate, onDelete }: SrtFileCardProps) => {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="true">有効</SelectItem>
-                  <SelectItem value="false">無効</SelectItem>
+                  <SelectItem value="true">有効 - 話者名を追加</SelectItem>
+                  <SelectItem value="false">無効 - 純粋な発話内容のみ</SelectItem>
                 </SelectContent>
               </Select>
             </div>
