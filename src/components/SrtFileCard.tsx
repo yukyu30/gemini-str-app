@@ -803,8 +803,20 @@ const SrtFileCard = ({ audioFile, onUpdate, onDelete }: SrtFileCardProps) => {
                   }
                 };
                 
-                // 実際のステージと統合
-                const stages = { ...defaultStages, ...audioFile.stages };
+                // 実際のステージと統合（実際のデータを優先）
+                const stages = audioFile.stages ? 
+                  Object.fromEntries(
+                    Object.entries(defaultStages).map(([key, defaultStage]) => {
+                      const stageKey = key as keyof typeof audioFile.stages;
+                      return [
+                        key, 
+                        audioFile.stages?.[stageKey] ? {
+                          ...defaultStage,
+                          ...audioFile.stages[stageKey]
+                        } : defaultStage
+                      ];
+                    })
+                  ) : defaultStages;
                 
                 return Object.entries(stages).map(([key, stage], index) => {
                   const isExpanded =
