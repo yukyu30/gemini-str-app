@@ -89,13 +89,74 @@ function timeToSeconds(timeString: string): number {
   return hours * 3600 + minutes * 60 + seconds + Number(ms) / 1000
 }
 
-export function downloadSrtFile(content: string, filename: string) {
-  const element = document.createElement('a')
-  const file = new Blob([content], { type: 'application/x-subrip' })
-  element.href = URL.createObjectURL(file)
-  element.download = filename.endsWith('.srt') ? filename : `${filename}.srt`
-  document.body.appendChild(element)
-  element.click()
-  document.body.removeChild(element)
-  URL.revokeObjectURL(element.href)
+export async function downloadSrtFile(content: string, filename: string) {
+  try {
+    console.log('downloadSrtFile called with:', { contentLength: content.length, filename })
+    
+    // Tauriの場合、カスタムコマンドを使用
+    if (typeof window !== 'undefined' && (window as any).__TAURI__) {
+      const { invoke } = await import('@tauri-apps/api/core')
+      
+      const suggestedFilename = filename.endsWith('.srt') ? filename : `${filename}.srt`
+      
+      try {
+        const savedPath = await invoke<string>('save_srt_file', {
+          content,
+          suggestedFilename
+        })
+        
+        console.log('File saved successfully via Tauri:', savedPath)
+        alert(`ファイルを保存しました: ${savedPath}`)
+        return
+      } catch (tauriError) {
+        console.error('Tauri save failed:', tauriError)
+        // フォールバックでブラウザのダウンロード方法を試す
+      }
+    }
+    
+    // ブラウザの場合、または Tauri が失敗した場合の従来のダウンロード方法
+    const element = document.createElement('a')
+    const file = new Blob([content], { type: 'text/plain; charset=utf-8' })
+    element.href = URL.createObjectURL(file)
+    element.download = filename.endsWith('.srt') ? filename : `${filename}.srt`
+    
+    // より確実なダウンロード実行
+    element.style.display = 'none'
+    document.body.appendChild(element)
+    
+    console.log('Download element created:', { href: element.href, download: element.download })
+    
+    element.click()
+    
+    // クリーンアップを少し遅らせる
+    setTimeout(() => {
+      if (document.body.contains(element)) {
+        document.body.removeChild(element)
+      }
+      URL.revokeObjectURL(element.href)
+      console.log('Download cleanup completed')
+    }, 100)
+    
+    console.log('Download initiated successfully')
+  } catch (error) {
+    console.error('Download failed:', error)
+    
+    // フォールバック：クリップボードにコピー
+    try {
+      await navigator.clipboard.writeText(content)
+      alert(`ダウンロードに失敗しました。内容をクリップボードにコピーしました。\nファイル名: ${filename}`)
+    } catch (clipboardError) {
+      console.error('Clipboard copy also failed:', clipboardError)
+      
+      // 最後の手段：テキストエリアでコピー
+      const textarea = document.createElement('textarea')
+      textarea.value = content
+      document.body.appendChild(textarea)
+      textarea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textarea)
+      
+      alert(`ダウンロードに失敗しました。内容をクリップボードにコピーしました。\nファイル名: ${filename}`)
+    }
+  }
 }

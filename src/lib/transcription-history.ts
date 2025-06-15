@@ -12,6 +12,7 @@ interface TranscriptionHistoryItem {
   result?: string
   subtitles?: AudioFile['subtitles']
   error?: string
+  srtValidation?: AudioFile['srtValidation']
   timestamp: number
   completedAt?: number
 }
@@ -31,6 +32,7 @@ export const transcriptionHistory = {
         result: audioFile.result,
         subtitles: audioFile.subtitles,
         error: audioFile.error,
+        srtValidation: audioFile.srtValidation,
         timestamp: Date.now(),
         completedAt: audioFile.status === 'completed' ? Date.now() : undefined
       }
@@ -86,6 +88,7 @@ export const transcriptionHistory = {
         result: historyItem.result,
         subtitles: historyItem.subtitles,
         error: historyItem.error,
+        srtValidation: historyItem.srtValidation,
         progress: undefined
       }
       

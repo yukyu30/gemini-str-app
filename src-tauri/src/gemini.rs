@@ -31,7 +31,18 @@ pub struct FileInfo {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GenerateContentRequest {
     pub contents: Vec<Content>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tools: Option<Vec<Tool>>,
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Tool {
+    #[serde(rename = "googleSearch")]
+    pub google_search: GoogleSearch,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct GoogleSearch {}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Content {
@@ -71,6 +82,33 @@ pub struct Candidate {
     pub index: Option<i32>,
     #[serde(rename = "safetyRatings")]
     pub safety_ratings: Option<Vec<SafetyRating>>,
+    #[serde(rename = "groundingMetadata")]
+    pub grounding_metadata: Option<GroundingMetadata>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct GroundingMetadata {
+    #[serde(rename = "searchEntryPoint")]
+    pub search_entry_point: Option<SearchEntryPoint>,
+    #[serde(rename = "groundingChunks")]
+    pub grounding_chunks: Option<Vec<GroundingChunk>>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SearchEntryPoint {
+    #[serde(rename = "renderedContent")]
+    pub rendered_content: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct GroundingChunk {
+    pub web: Option<WebChunk>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct WebChunk {
+    pub uri: Option<String>,
+    pub title: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -162,9 +200,16 @@ impl GeminiClient {
                     }
                 ],
             }],
+            tools: None,
         };
 
-        let url = format!("{}/v1beta/models/{}:generateContent?key={}", self.base_url, model, self.api_key);
+        // Remove "models/" prefix if it exists, as we'll add it in the URL
+        let model_name = if model.starts_with("models/") {
+            &model[7..] // Remove "models/" prefix
+        } else {
+            model
+        };
+        let url = format!("{}/v1beta/models/{}:generateContent?key={}", self.base_url, model_name, self.api_key);
         
         let response = self.client
             .post(&url)
@@ -216,5 +261,106 @@ impl GeminiClient {
         }
         
         Err("File processing timeout".into())
+    }
+
+    pub async fn generate_text_content(&self, text: &str, model: &str) -> Result<String, Box<dyn std::error::Error>> {
+        // Remove "models/" prefix if it exists, as we'll add it in the URL
+        let model_name = if model.starts_with("models/") {
+            &model[7..] // Remove "models/" prefix
+        } else {
+            model
+        };
+        let url = format!("{}/v1beta/models/{}:generateContent?key={}", self.base_url, model_name, self.api_key);
+        
+        let request = GenerateContentRequest {
+            contents: vec![
+                Content {
+                    parts: vec![Part::Text { text: text.to_string() }],
+                }
+            ],
+            tools: None,
+        };
+
+        let response = self.client
+            .post(&url)
+            .json(&request)
+            .send()
+            .await?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+            return Err(format!("Text content generation failed ({}): {}", status, error_text).into());
+        }
+
+        let response_text = response.text().await?;
+        eprintln!("Generate text content response: {}", response_text);
+        
+        let generate_response: GenerateContentResponse = serde_json::from_str(&response_text)
+            .map_err(|e| format!("Failed to parse text generation response: {} - Response: {}", e, response_text))?;
+        
+        if let Some(candidate) = generate_response.candidates.first() {
+            if let Some(Part::Text { text }) = candidate.content.parts.first() {
+                return Ok(text.clone());
+            }
+        }
+
+        Err("No text content found in response".into())
+    }
+
+    pub async fn generate_text_content_with_search(&self, text: &str, model: &str) -> Result<(String, Option<String>), Box<dyn std::error::Error>> {
+        // Remove "models/" prefix if it exists, as we'll add it in the URL
+        let model_name = if model.starts_with("models/") {
+            &model[7..] // Remove "models/" prefix
+        } else {
+            model
+        };
+        let url = format!("{}/v1beta/models/{}:generateContent?key={}", self.base_url, model_name, self.api_key);
+        
+        let request = GenerateContentRequest {
+            contents: vec![
+                Content {
+                    parts: vec![Part::Text { text: text.to_string() }],
+                }
+            ],
+            tools: Some(vec![Tool {
+                google_search: GoogleSearch {},
+            }]),
+        };
+
+        let response = self.client
+            .post(&url)
+            .json(&request)
+            .send()
+            .await?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+            return Err(format!("Text content generation with search failed ({}): {}", status, error_text).into());
+        }
+
+        let response_text = response.text().await?;
+        eprintln!("Generate text content with search response: {}", response_text);
+        
+        let generate_response: GenerateContentResponse = serde_json::from_str(&response_text)
+            .map_err(|e| format!("Failed to parse text generation response: {} - Response: {}", e, response_text))?;
+        
+        if let Some(candidate) = generate_response.candidates.first() {
+            let text_content = if let Some(Part::Text { text }) = candidate.content.parts.first() {
+                text.clone()
+            } else {
+                return Err("No text content found in response".into());
+            };
+
+            let search_info = candidate.grounding_metadata.as_ref()
+                .and_then(|gm| gm.search_entry_point.as_ref())
+                .and_then(|sep| sep.rendered_content.as_ref())
+                .cloned();
+
+            return Ok((text_content, search_info));
+        }
+
+        Err("No candidate found in response".into())
     }
 }
