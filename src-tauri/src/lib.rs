@@ -1,5 +1,6 @@
 use keyring::Entry;
 use std::path::Path;
+use tokio::fs;
 
 mod gemini;
 use gemini::GeminiClient;
@@ -105,18 +106,41 @@ async fn get_transcription_progress() -> Result<String, String> {
     Ok("Processing...".to_string())
 }
 
+#[tauri::command]
+async fn save_temp_file(file_data: Vec<u8>, file_name: String) -> Result<String, String> {
+    // Get the file extension from the original filename
+    let extension = Path::new(&file_name)
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .unwrap_or("bin");
+    
+    // Create a new temp file with the correct extension
+    let temp_dir = std::env::temp_dir();
+    let temp_file_path = temp_dir.join(format!("audio_temp_{}.{}", 
+        uuid::Uuid::new_v4().to_string(), extension));
+    
+    // Write the file data
+    fs::write(&temp_file_path, file_data).await
+        .map_err(|e| format!("Failed to write temp file: {}", e))?;
+    
+    // Return the path as string
+    Ok(temp_file_path.to_string_lossy().to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_store::Builder::new().build())
+        .plugin(tauri_plugin_fs::init())
         .invoke_handler(tauri::generate_handler![
             greet,
             set_api_key,
             get_api_key,
             delete_api_key,
             transcribe_audio,
-            get_transcription_progress
+            get_transcription_progress,
+            save_temp_file
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
