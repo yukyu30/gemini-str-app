@@ -102,7 +102,7 @@ export async function downloadSrtFile(content: string, filename: string) {
       try {
         const savedPath = await invoke<string>('save_srt_file', {
           content,
-          suggestedFilename
+          suggested_filename: suggestedFilename
         })
         
         console.log('File saved successfully via Tauri:', savedPath)

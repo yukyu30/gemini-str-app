@@ -29,7 +29,7 @@ import { AudioFile, SrtSettings } from '@/types/srt';
 import { SRT_PROMPT, INITIAL_TRANSCRIPTION_PROMPT } from '@/constants/prompts';
 import { storageUtils } from '@/utils/storage';
 import { formatFileSize } from '@/lib/utils';
-import { downloadSrtFile, parseSrt, validateSrt } from '@/lib/srt-utils';
+import { parseSrt, validateSrt } from '@/lib/srt-utils';
 import { useToast } from '@/hooks/use-toast';
 import AudioSubtitlePreview from './AudioSubtitlePreview';
 
@@ -329,7 +329,10 @@ const SrtFileCard = ({ audioFile, onUpdate, onDelete }: SrtFileCardProps) => {
     const filename = `${baseName}_subtitles.srt`;
 
     try {
-      await downloadSrtFile(audioFile.result, filename);
+      await invoke<string>('save_srt_file', {
+        content: audioFile.result,
+        suggested_filename: filename,
+      });
       toast({
         variant: 'success',
         title: 'ダウンロード完了',
