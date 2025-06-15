@@ -760,7 +760,7 @@ const SrtFileCard = ({ audioFile, onUpdate, onDelete }: SrtFileCardProps) => {
         ) && (
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <h4 className="font-medium">処理ステップ (6段階)</h4>
+              <h4 className="font-medium">処理ステップ (4段階)</h4>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 {audioFile.status === 'completed' && (
                   <>
