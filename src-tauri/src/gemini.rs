@@ -22,8 +22,10 @@ pub struct FileInfo {
     pub update_time: String,
     #[serde(rename = "expirationTime")]
     pub expiration_time: String,
-    pub sha256: String,
+    #[serde(rename = "sha256Hash")]
+    pub sha256_hash: String,
     pub state: String,
+    pub source: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
