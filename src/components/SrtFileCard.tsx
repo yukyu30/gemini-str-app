@@ -432,14 +432,83 @@ const SrtFileCard = ({ audioFile, onUpdate, onDelete }: SrtFileCardProps) => {
               <div className="space-y-2 p-3 bg-muted/30 rounded-md">
                 <p className="text-xs font-medium text-muted-foreground">処理段階</p>
                 {Object.entries(audioFile.stages).map(([key, stage]) => (
-                  <div key={key} className="flex items-center gap-2 text-xs">
-                    {stage.status === 'completed' && <CheckCircle className="h-3 w-3 text-green-500" />}
-                    {stage.status === 'processing' && <Loader2 className="h-3 w-3 animate-spin text-blue-500" />}
-                    {stage.status === 'pending' && <div className="h-3 w-3 rounded-full bg-gray-300" />}
-                    {stage.status === 'error' && <AlertCircle className="h-3 w-3 text-red-500" />}
-                    <span className={stage.status === 'completed' ? 'text-green-600' : stage.status === 'processing' ? 'text-blue-600' : 'text-muted-foreground'}>
-                      {stage.name}
-                    </span>
+                  <div key={key} className="space-y-2">
+                    <div className="flex items-center gap-2 text-xs">
+                      {stage.status === 'completed' && <CheckCircle className="h-3 w-3 text-green-500" />}
+                      {stage.status === 'processing' && <Loader2 className="h-3 w-3 animate-spin text-blue-500" />}
+                      {stage.status === 'pending' && <div className="h-3 w-3 rounded-full bg-gray-300" />}
+                      {stage.status === 'error' && <AlertCircle className="h-3 w-3 text-red-500" />}
+                      <span className={stage.status === 'completed' ? 'text-green-600' : stage.status === 'processing' ? 'text-blue-600' : 'text-muted-foreground'}>
+                        {stage.name}
+                      </span>
+                      {stage.status === 'completed' && stage.result && (
+                        <div className="ml-auto flex items-center gap-2">
+                          <button
+                            onClick={() => {
+                              const element = document.getElementById(`stage-detail-${key}`)
+                              if (element) {
+                                const details = element.querySelector('details') as HTMLDetailsElement
+                                if (details) {
+                                  details.open = !details.open
+                                }
+                                element.scrollIntoView({ behavior: 'smooth' })
+                              }
+                            }}
+                            className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                          >
+                            デバッグ
+                          </button>
+                        </div>
+                      )}
+                      {stage.status === 'processing' && (
+                        <div className="ml-auto">
+                          <span className="text-xs text-blue-600">♻️ 実行中</span>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Inline debug info for completed steps */}
+                    {stage.status === 'completed' && stage.result && (
+                      <div className="ml-5 border-l-2 border-green-200 pl-3">
+                        <details className="group">
+                          <summary className="cursor-pointer text-xs text-green-600 hover:text-green-800 flex items-center gap-1">
+                            <span>☑️ 完了 - レスポンス確認</span>
+                            <span className="group-open:rotate-180 transition-transform">▼</span>
+                          </summary>
+                          <div className="mt-2 bg-gray-900 text-gray-100 p-2 rounded text-xs max-h-32 overflow-y-auto">
+                            <pre className="whitespace-pre-wrap font-mono">
+                              {stage.result.length > 300 ? stage.result.substring(0, 300) + '...' : stage.result}
+                            </pre>
+                          </div>
+                          <div className="mt-1 flex gap-2">
+                            <button
+                              onClick={() => navigator.clipboard.writeText(stage.result!)}
+                              className="text-xs px-2 py-1 bg-green-100 text-green-700 rounded hover:bg-green-200"
+                            >
+                              コピー
+                            </button>
+                            <button
+                              onClick={() => {
+                                const element = document.getElementById(`stage-detail-${key}`)
+                                if (element) {
+                                  element.scrollIntoView({ behavior: 'smooth' })
+                                }
+                              }}
+                              className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                            >
+                              詳細表示
+                            </button>
+                          </div>
+                        </details>
+                      </div>
+                    )}
+                    
+                    {stage.status === 'error' && stage.error && (
+                      <div className="ml-5 text-xs text-red-600 bg-red-50 p-2 rounded border-l-2 border-red-200">
+                        <div className="font-medium">❌ エラー詳細:</div>
+                        <pre className="mt-1 whitespace-pre-wrap">{stage.error}</pre>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -604,14 +673,16 @@ const SrtFileCard = ({ audioFile, onUpdate, onDelete }: SrtFileCardProps) => {
                   辞書CSVダウンロード
                 </Button>
               )}
-              <Button 
-                onClick={() => setShowGeminiDebug(!showGeminiDebug)} 
-                variant="ghost" 
-                className="flex items-center gap-2"
-              >
-                <FileText className="h-4 w-4" />
-                {showGeminiDebug ? 'Geminiデバッグを隠す' : 'Geminiデバッグを表示'}
-              </Button>
+              {!audioFile.settings.enableAdvancedProcessing && (
+                <Button 
+                  onClick={() => setShowGeminiDebug(!showGeminiDebug)} 
+                  variant="ghost" 
+                  className="flex items-center gap-2"
+                >
+                  <FileText className="h-4 w-4" />
+                  {showGeminiDebug ? 'Geminiデバッグを隠す' : 'Geminiデバッグを表示'}
+                </Button>
+              )}
             </>
           )}
 
@@ -691,83 +762,115 @@ const SrtFileCard = ({ audioFile, onUpdate, onDelete }: SrtFileCardProps) => {
           </div>
         )}
 
-        {/* Gemini Debug Section */}
-        {audioFile.status === 'completed' && showGeminiDebug && (
+        {/* Processing Steps Details (GitHub Actions style) */}
+        {audioFile.status === 'completed' && audioFile.settings.enableAdvancedProcessing && audioFile.stages && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="font-medium">処理詳細</h4>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <CheckCircle className="h-4 w-4 text-green-500" />
+                完了済み
+              </div>
+            </div>
+            
+            <div className="border rounded-lg bg-card">
+              {Object.entries(audioFile.stages).map(([key, stage], index) => (
+                <div key={key} id={`stage-detail-${key}`} className={`border-b last:border-b-0 ${stage.status === 'completed' ? 'bg-green-50/50' : stage.status === 'error' ? 'bg-red-50/50' : ''}`}>
+                  <details className="group">
+                    <summary className="cursor-pointer p-4 hover:bg-muted/30 flex items-center gap-3">
+                      <div className="flex items-center gap-2">
+                        {stage.status === 'completed' && <CheckCircle className="h-4 w-4 text-green-500" />}
+                        {stage.status === 'error' && <AlertCircle className="h-4 w-4 text-red-500" />}
+                        <span className="font-medium text-sm">{stage.name}</span>
+                      </div>
+                      <div className="ml-auto flex items-center gap-2">
+                        <div className="text-xs text-muted-foreground">
+                          ステップ {index + 1}/{Object.keys(audioFile.stages || {}).length}
+                        </div>
+                        <div className="text-xs text-muted-foreground group-open:rotate-180 transition-transform">
+                          ▼
+                        </div>
+                      </div>
+                    </summary>
+                    
+                    <div className="px-4 pb-4">
+                      {stage.status === 'completed' && stage.result && (
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium text-green-600">✓ 処理完了</span>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => navigator.clipboard.writeText(stage.result!)}
+                                className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                              >
+                                コピー
+                              </button>
+                            </div>
+                          </div>
+                          <div className="bg-gray-900 text-gray-100 p-3 rounded-md max-h-80 overflow-y-auto">
+                            <pre className="text-xs whitespace-pre-wrap font-mono">
+                              {stage.result}
+                            </pre>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {stage.status === 'error' && stage.error && (
+                        <div className="space-y-2">
+                          <span className="text-sm font-medium text-red-600">✗ エラーが発生しました</span>
+                          <div className="bg-red-100 text-red-800 p-3 rounded-md">
+                            <pre className="text-xs whitespace-pre-wrap">
+                              {stage.error}
+                            </pre>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </details>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Gemini Debug Section (for standard mode) */}
+        {audioFile.status === 'completed' && showGeminiDebug && !audioFile.settings.enableAdvancedProcessing && audioFile.result && (
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <h4 className="font-medium">Geminiレスポンスデバッグ情報</h4>
             </div>
             
-            <div className="space-y-3">
-              {/* 基本文字起こし */}
-              {audioFile.stages?.initialTranscription?.result && (
-                <details className="border rounded p-3">
-                  <summary className="cursor-pointer font-medium text-sm">
-                    基本文字起こし (Gemini 2.0 Flash)
-                  </summary>
-                  <div className="mt-2 bg-muted p-3 rounded-md max-h-64 overflow-y-auto">
-                    <pre className="text-xs whitespace-pre-wrap font-mono">
-                      {audioFile.stages.initialTranscription.result}
-                    </pre>
+            <div className="border rounded-lg bg-card">
+              <details className="group">
+                <summary className="cursor-pointer p-4 hover:bg-muted/30 flex items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 text-green-500" />
+                    <span className="font-medium text-sm">標準文字起こし (Gemini {audioFile.settings.model})</span>
                   </div>
-                </details>
-              )}
-
-              {/* トピック分析 */}
-              {audioFile.stages?.topicAnalysis?.result && (
-                <details className="border rounded p-3">
-                  <summary className="cursor-pointer font-medium text-sm">
-                    トピック分析 (Gemini 2.0 Flash)
-                  </summary>
-                  <div className="mt-2 bg-muted p-3 rounded-md max-h-64 overflow-y-auto">
-                    <pre className="text-xs whitespace-pre-wrap font-mono">
-                      {audioFile.stages.topicAnalysis.result}
-                    </pre>
+                  <div className="ml-auto text-xs text-muted-foreground group-open:rotate-180 transition-transform">
+                    ▼
                   </div>
-                </details>
-              )}
-
-              {/* 辞書作成 */}
-              {audioFile.stages?.dictionaryCreation?.result && (
-                <details className="border rounded p-3">
-                  <summary className="cursor-pointer font-medium text-sm">
-                    辞書作成 (Google検索+Gemini 2.0 Flash)
-                  </summary>
-                  <div className="mt-2 bg-muted p-3 rounded-md max-h-64 overflow-y-auto">
-                    <pre className="text-xs whitespace-pre-wrap font-mono">
-                      {audioFile.stages.dictionaryCreation.result}
-                    </pre>
+                </summary>
+                
+                <div className="px-4 pb-4">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-green-600">✓ 処理完了</span>
+                      <button
+                        onClick={() => navigator.clipboard.writeText(audioFile.result!)}
+                        className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                      >
+                        コピー
+                      </button>
+                    </div>
+                    <div className="bg-gray-900 text-gray-100 p-3 rounded-md max-h-80 overflow-y-auto">
+                      <pre className="text-xs whitespace-pre-wrap font-mono">
+                        {audioFile.result}
+                      </pre>
+                    </div>
                   </div>
-                </details>
-              )}
-
-              {/* 最終字幕生成 */}
-              {audioFile.stages?.finalTranscription?.result && (
-                <details className="border rounded p-3">
-                  <summary className="cursor-pointer font-medium text-sm">
-                    最終字幕生成 (Gemini 2.5 Pro)
-                  </summary>
-                  <div className="mt-2 bg-muted p-3 rounded-md max-h-64 overflow-y-auto">
-                    <pre className="text-xs whitespace-pre-wrap font-mono">
-                      {audioFile.stages.finalTranscription.result}
-                    </pre>
-                  </div>
-                </details>
-              )}
-
-              {/* 標準モードの場合 */}
-              {!audioFile.settings.enableAdvancedProcessing && audioFile.result && (
-                <details className="border rounded p-3">
-                  <summary className="cursor-pointer font-medium text-sm">
-                    標準文字起こし (Gemini {audioFile.settings.model})
-                  </summary>
-                  <div className="mt-2 bg-muted p-3 rounded-md max-h-64 overflow-y-auto">
-                    <pre className="text-xs whitespace-pre-wrap font-mono">
-                      {audioFile.result}
-                    </pre>
-                  </div>
-                </details>
-              )}
+                </div>
+              </details>
             </div>
           </div>
         )}
