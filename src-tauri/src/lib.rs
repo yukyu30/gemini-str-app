@@ -16,17 +16,29 @@ fn greet(name: &str) -> String {
 
 #[tauri::command]
 async fn set_api_key(api_key: String) -> Result<bool, String> {
+    println!("DEBUG: Attempting to save API key, length: {}", api_key.len());
+    
     if api_key.trim().is_empty() {
+        println!("DEBUG: API key is empty");
         return Err("API key cannot be empty".to_string());
     }
 
     let entry = Entry::new(SERVICE_NAME, API_KEY_ENTRY)
-        .map_err(|e| format!("Failed to create keyring entry: {}", e))?;
+        .map_err(|e| {
+            println!("DEBUG: Failed to create keyring entry: {}", e);
+            format!("Failed to create keyring entry: {}", e)
+        })?;
     
-    entry.set_password(&api_key)
-        .map_err(|e| format!("Failed to store API key: {}", e))?;
-    
-    Ok(true)
+    match entry.set_password(&api_key) {
+        Ok(_) => {
+            println!("DEBUG: Successfully saved API key to keyring");
+            Ok(true)
+        },
+        Err(e) => {
+            println!("DEBUG: Failed to save API key: {}", e);
+            Err(format!("Failed to store API key: {}", e))
+        }
+    }
 }
 
 #[tauri::command]
@@ -60,16 +72,43 @@ async fn get_api_key_preview() -> Result<String, String> {
     
     match entry.get_password() {
         Ok(password) => {
+            println!("DEBUG: Retrieved password, length: {}", password.len());
             if password.trim().is_empty() {
+                println!("DEBUG: Password is empty");
                 Ok(String::new())
             } else if password.len() > 4 {
-                Ok(format!("****{}", &password[password.len()-4..]))
+                let preview = format!("****{}", &password[password.len()-4..]);
+                println!("DEBUG: Generated preview: {}", preview);
+                Ok(preview)
             } else {
+                println!("DEBUG: Password too short, using ****");
                 Ok("****".to_string())
             }
         },
-        Err(keyring::Error::NoEntry) => Ok(String::new()),
-        Err(e) => Err(format!("Failed to retrieve API key: {}", e)),
+        Err(keyring::Error::NoEntry) => {
+            println!("DEBUG: No entry found in keyring");
+            Ok(String::new())
+        },
+        Err(e) => {
+            println!("DEBUG: Keyring error: {}", e);
+            Err(format!("Failed to retrieve API key: {}", e))
+        },
+    }
+}
+
+#[tauri::command]
+async fn debug_keyring() -> Result<String, String> {
+    let entry = Entry::new(SERVICE_NAME, API_KEY_ENTRY)
+        .map_err(|e| format!("Failed to create keyring entry: {}", e))?;
+    
+    match entry.get_password() {
+        Ok(password) => {
+            Ok(format!("Found API key, length: {}, first 10 chars: {}", 
+                password.len(), 
+                if password.len() > 10 { &password[0..10] } else { &password }))
+        },
+        Err(keyring::Error::NoEntry) => Ok("No API key found in keyring".to_string()),
+        Err(e) => Err(format!("Keyring error: {}", e)),
     }
 }
 
@@ -159,6 +198,7 @@ pub fn run() {
             get_api_key,
             get_api_key_preview,
             delete_api_key,
+            debug_keyring,
             transcribe_audio,
             get_transcription_progress,
             save_temp_file
