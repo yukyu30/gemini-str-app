@@ -3,6 +3,7 @@ import SrtTranscription from "./components/SrtTranscription";
 import Settings from "./components/Settings";
 import { Button } from "./components/ui/button";
 import { Card, CardContent } from "./components/ui/card";
+import { Toaster } from "./components/ui/toaster";
 import { FileAudio, Settings as SettingsIcon, AlertTriangle } from "lucide-react";
 import { useProcessingLock } from "./hooks/useProcessingLock";
 
@@ -149,6 +150,7 @@ function App() {
             </Card>
           </div>
         )}
+        <Toaster />
       </main>
     </ProcessingContext.Provider>
   );

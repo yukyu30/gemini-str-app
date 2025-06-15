@@ -9,7 +9,6 @@ export interface SrtSettings {
   maxCharsPerSubtitle: number
   enableSpeakerDetection: boolean
   removeFillerWords: boolean
-  model: string
   enableAdvancedProcessing: boolean
   customDictionaryPath?: string
 }
@@ -58,7 +57,6 @@ export const DEFAULT_SRT_SETTINGS: SrtSettings = {
   maxCharsPerSubtitle: 20,
   enableSpeakerDetection: false, // デフォルトを false に変更
   removeFillerWords: true,
-  model: 'gemini-2.0-flash',
   enableAdvancedProcessing: false,
   customDictionaryPath: undefined
 }

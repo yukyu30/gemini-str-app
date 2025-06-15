@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { AlertCircle, FileAudio, Settings as SettingsIcon, Save, RotateCcw } from 'lucide-react'
+import { AlertCircle, FileAudio, Settings as SettingsIcon, Save } from 'lucide-react'
 
 import SrtDropZone from './SrtDropZone'
 import SrtFileCard from './SrtFileCard'
@@ -9,7 +9,6 @@ import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 import { AudioFile, DEFAULT_SRT_SETTINGS, SrtSettings } from '@/types/srt'
-import { GEMINI_MODELS } from '@/constants/prompts'
 import { settingsStorage } from '@/lib/settings-storage'
 import { useProcessing } from '../App'
 
@@ -18,7 +17,6 @@ const SrtTranscription = () => {
   const [globalError, setGlobalError] = useState('')
   const [globalSettings, setGlobalSettings] = useState<SrtSettings>(DEFAULT_SRT_SETTINGS)
   const [settingsSaved, setSettingsSaved] = useState(false)
-  const [showGlobalSettings, setShowGlobalSettings] = useState(false)
   
   const { setProcessingCount } = useProcessing()
 
@@ -115,11 +113,6 @@ const SrtTranscription = () => {
     setTimeout(() => setSettingsSaved(false), 2000) // Reset after 2 seconds
   }
 
-  const resetDefaultSettings = () => {
-    const defaults = settingsStorage.resetToDefaults()
-    setGlobalSettings(defaults)
-    setSettingsSaved(false)
-  }
 
 
   const statusCounts = getStatusCounts()
@@ -182,38 +175,8 @@ const SrtTranscription = () => {
 
               {/* Global Settings */}
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h4 className="font-medium">デフォルト設定</h4>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowGlobalSettings(!showGlobalSettings)}
-                  >
-                    {showGlobalSettings ? '設定を隠す' : '設定を表示'}
-                  </Button>
-                </div>
-
-                {showGlobalSettings && (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-muted/50 rounded-md">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">AIモデル</label>
-                      <Select 
-                        value={globalSettings.model}
-                        onValueChange={(value) => updateGlobalSetting('model', value)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {GEMINI_MODELS.map((model) => (
-                            <SelectItem key={model.id} value={model.id}>
-                              {model.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
+                <h4 className="font-medium">デフォルト設定</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-muted/50 rounded-md">
                     <div className="space-y-2">
                       <label className="text-sm font-medium">最大文字数/字幕</label>
                       <Select 
@@ -253,33 +216,50 @@ const SrtTranscription = () => {
                       </Select>
                     </div>
 
-                    <div className="md:col-span-3 flex gap-2">
-                      <Button
-                        variant="outline"
-                        onClick={applyGlobalSettings}
-                        className="flex-1"
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">
+                        処理モード
+                        <span className="text-xs text-muted-foreground ml-2">
+                          (現在: {globalSettings.enableAdvancedProcessing ? '高精度モード' : '標準モード'})
+                        </span>
+                      </label>
+                      <Select 
+                        value={globalSettings.enableAdvancedProcessing ? 'true' : 'false'}
+                        onValueChange={(value) => updateGlobalSetting('enableAdvancedProcessing', value === 'true')}
                       >
-                        全ファイルに設定を適用
-                      </Button>
-                      <Button
-                        onClick={saveDefaultSettings}
-                        className="flex items-center gap-2"
-                        disabled={settingsSaved}
-                      >
-                        <Save className="h-4 w-4" />
-                        {settingsSaved ? '保存済み' : 'デフォルトとして保存'}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        onClick={resetDefaultSettings}
-                        className="flex items-center gap-2"
-                      >
-                        <RotateCcw className="h-4 w-4" />
-                        初期設定に戻す
-                      </Button>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="false">標準モード - 高速処理</SelectItem>
+                          <SelectItem value="true">高精度モード - トピック分析＋専門用語辞書</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {globalSettings.enableAdvancedProcessing && (
+                        <p className="text-xs text-muted-foreground">
+                          高精度モードでは、文字起こし→トピック分析→Google検索で正確性を確認した辞書作成→最終生成の4段階処理を行います
+                        </p>
+                      )}
                     </div>
+
+                  <div className="md:col-span-3 flex gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={applyGlobalSettings}
+                      className="flex-1"
+                    >
+                      全ファイルに設定を適用
+                    </Button>
+                    <Button
+                      onClick={saveDefaultSettings}
+                      className="flex items-center gap-2"
+                      disabled={settingsSaved}
+                    >
+                      <Save className="h-4 w-4" />
+                      {settingsSaved ? '保存済み' : 'デフォルトとして保存'}
+                    </Button>
                   </div>
-                )}
+                </div>
               </div>
 
               {/* Bulk Actions */}
