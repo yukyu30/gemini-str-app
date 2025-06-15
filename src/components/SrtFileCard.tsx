@@ -348,9 +348,9 @@ const SrtFileCard = ({ audioFile, onUpdate, onDelete }: SrtFileCardProps) => {
   const downloadSrt = async () => {
     if (!audioFile.result) {
       toast({
-        variant: "destructive",
-        title: "ダウンロードエラー",
-        description: "ダウンロードできる内容がありません",
+        variant: 'destructive',
+        title: 'ダウンロードエラー',
+        description: 'ダウンロードできる内容がありません',
       });
       return;
     }
@@ -361,16 +361,16 @@ const SrtFileCard = ({ audioFile, onUpdate, onDelete }: SrtFileCardProps) => {
     try {
       await downloadSrtFile(audioFile.result, filename);
       toast({
-        variant: "success",
-        title: "ダウンロード完了",
+        variant: 'success',
+        title: 'ダウンロード完了',
         description: `${filename} をダウンロードしました`,
       });
     } catch (error) {
       console.error('Download failed in SrtFileCard:', error);
       toast({
-        variant: "destructive",
-        title: "ダウンロードエラー",
-        description: "ファイルのダウンロードに失敗しました",
+        variant: 'destructive',
+        title: 'ダウンロードエラー',
+        description: 'ファイルのダウンロードに失敗しました',
       });
     }
   };
@@ -378,9 +378,9 @@ const SrtFileCard = ({ audioFile, onUpdate, onDelete }: SrtFileCardProps) => {
   const downloadDictionary = async () => {
     if (!audioFile.dictionary) {
       toast({
-        variant: "destructive",
-        title: "ダウンロードエラー",
-        description: "ダウンロードできる辞書がありません",
+        variant: 'destructive',
+        title: 'ダウンロードエラー',
+        description: 'ダウンロードできる辞書がありません',
       });
       return;
     }
@@ -394,16 +394,16 @@ const SrtFileCard = ({ audioFile, onUpdate, onDelete }: SrtFileCardProps) => {
         suggestedFilename: filename,
       });
       toast({
-        variant: "success",
-        title: "ダウンロード完了",
+        variant: 'success',
+        title: 'ダウンロード完了',
         description: `辞書CSV (${filename}) をダウンロードしました`,
       });
     } catch (error) {
       console.error('Dictionary download failed:', error);
       toast({
-        variant: "destructive",
-        title: "ダウンロードエラー",
-        description: "辞書のダウンロードに失敗しました",
+        variant: 'destructive',
+        title: 'ダウンロードエラー',
+        description: '辞書のダウンロードに失敗しました',
       });
     }
   };
@@ -518,43 +518,6 @@ const SrtFileCard = ({ audioFile, onUpdate, onDelete }: SrtFileCardProps) => {
                 {audioFile.progress}
               </p>
             </div>
-
-            {/* Processing Steps List */}
-            {audioFile.settings.enableAdvancedProcessing &&
-              audioFile.stages && (
-                <div className="space-y-2 p-3 bg-muted/30 rounded-md">
-                  <p className="text-xs font-medium text-muted-foreground">
-                    処理ステップ
-                  </p>
-                  {Object.entries(audioFile.stages).map(([key, stage]) => (
-                    <div key={key} className="flex items-center gap-2 text-xs">
-                      {stage.status === 'completed' && (
-                        <CheckCircle className="h-3 w-3 text-green-500" />
-                      )}
-                      {stage.status === 'processing' && (
-                        <Loader2 className="h-3 w-3 animate-spin text-blue-500" />
-                      )}
-                      {stage.status === 'pending' && (
-                        <div className="h-3 w-3 rounded-full bg-gray-300" />
-                      )}
-                      {stage.status === 'error' && (
-                        <AlertCircle className="h-3 w-3 text-red-500" />
-                      )}
-                      <span
-                        className={
-                          stage.status === 'completed'
-                            ? 'text-green-600'
-                            : stage.status === 'processing'
-                              ? 'text-blue-600'
-                              : 'text-muted-foreground'
-                        }
-                      >
-                        {stage.name}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
           </div>
         )}
 
@@ -751,36 +714,6 @@ const SrtFileCard = ({ audioFile, onUpdate, onDelete }: SrtFileCardProps) => {
           )}
         </div>
 
-        {/* Completed Processing Steps List */}
-        {audioFile.status === 'completed' &&
-          audioFile.settings.enableAdvancedProcessing &&
-          audioFile.stages && (
-            <div className="space-y-2 p-3 bg-green-50 border border-green-200 rounded-md">
-              <p className="text-xs font-medium text-green-700">
-                完了した処理ステップ
-              </p>
-              {Object.entries(audioFile.stages).map(([key, stage]) => (
-                <div key={key} className="flex items-center gap-2 text-xs">
-                  {stage.status === 'completed' && (
-                    <CheckCircle className="h-3 w-3 text-green-500" />
-                  )}
-                  {stage.status === 'error' && (
-                    <AlertCircle className="h-3 w-3 text-red-500" />
-                  )}
-                  <span
-                    className={
-                      stage.status === 'completed'
-                        ? 'text-green-600'
-                        : 'text-red-600'
-                    }
-                  >
-                    {stage.name}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-
         {/* Result Section */}
         {audioFile.status === 'completed' && audioFile.result && (
           <div className="space-y-3">
@@ -822,10 +755,12 @@ const SrtFileCard = ({ audioFile, onUpdate, onDelete }: SrtFileCardProps) => {
         )}
 
         {/* GitHub Actions Style Processing Steps */}
-        {audioFile.settings.enableAdvancedProcessing && audioFile.stages && (
+        {audioFile.settings.enableAdvancedProcessing && (
+          audioFile.status === 'processing' || audioFile.status === 'completed' || audioFile.status === 'error'
+        ) && (
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <h4 className="font-medium">処理ステップ</h4>
+              <h4 className="font-medium">処理ステップ (6段階)</h4>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 {audioFile.status === 'completed' && (
                   <>
@@ -843,12 +778,40 @@ const SrtFileCard = ({ audioFile, onUpdate, onDelete }: SrtFileCardProps) => {
             </div>
 
             <div className="border rounded-lg bg-card overflow-hidden">
-              {Object.entries(audioFile.stages).map(([key, stage], index) => {
-                const isExpanded =
-                  stage.status === 'completed' || stage.status === 'error';
+              {(() => {
+                // デフォルトのステップ定義
+                const defaultStages = {
+                  initialTranscription: {
+                    name: '基本文字起こし (Gemini 2.0 Flash)',
+                    status: 'pending' as const,
+                    description: '音声ファイルから基本的な文字起こしを行います'
+                  },
+                  topicAnalysis: {
+                    name: 'トピック分析 (Gemini 2.0 Flash)',
+                    status: 'pending' as const,
+                    description: '文字起こし結果からトピックと主要テーマを分析します'
+                  },
+                  dictionaryCreation: {
+                    name: '辞書作成 (Google検索+Gemini 2.0 Flash)',
+                    status: 'pending' as const,
+                    description: 'トピックに関連する専門用語辞書をGoogle検索で作成します'
+                  },
+                  finalTranscription: {
+                    name: '最終字幕生成 (Gemini 2.5 Pro)',
+                    status: 'pending' as const,
+                    description: '辞書を使用して高精度なSRT字幕を生成します'
+                  }
+                };
+                
+                // 実際のステージと統合
+                const stages = { ...defaultStages, ...audioFile.stages };
+                
+                return Object.entries(stages).map(([key, stage], index) => {
+                  const isExpanded =
+                    stage.status === 'completed' || stage.status === 'error';
 
-                return (
-                  <div
+                  return (
+                    <div
                     key={key}
                     id={`stage-detail-${key}`}
                     className={`border-b last:border-b-0 ${
@@ -904,8 +867,7 @@ const SrtFileCard = ({ audioFile, onUpdate, onDelete }: SrtFileCardProps) => {
                                     </span>
                                   )}
                                   <span className="text-xs text-muted-foreground">
-                                    {index + 1}/
-                                    {Object.keys(audioFile.stages || {}).length}
+                                    {index + 1}/4
                                   </span>
                                 </div>
                               </div>
@@ -1007,11 +969,23 @@ const SrtFileCard = ({ audioFile, onUpdate, onDelete }: SrtFileCardProps) => {
                           )}
 
                           {stage.status === 'processing' && (
-                            <div className="flex items-center gap-3 text-blue-600">
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                              <span className="text-sm">
-                                このステップを実行中です...
-                              </span>
+                            <div className="space-y-3">
+                              <div className="flex items-center gap-3 text-blue-600">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                <span className="text-sm">
+                                  このステップを実行中です...
+                                </span>
+                              </div>
+                              {stage.description && (
+                                <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg">
+                                  <div className="text-xs font-medium text-blue-700 mb-1">
+                                    実行中の処理:
+                                  </div>
+                                  <div className="text-sm text-blue-600">
+                                    {stage.description}
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           )}
 
@@ -1032,19 +1006,32 @@ const SrtFileCard = ({ audioFile, onUpdate, onDelete }: SrtFileCardProps) => {
                           )}
 
                           {stage.status === 'pending' && (
-                            <div className="flex items-center gap-3 text-gray-500">
-                              <div className="h-4 w-4 rounded-full border-2 border-gray-300" />
-                              <span className="text-sm">
-                                このステップは待機中です
-                              </span>
+                            <div className="space-y-3">
+                              <div className="flex items-center gap-3 text-gray-500">
+                                <div className="h-4 w-4 rounded-full border-2 border-gray-300" />
+                                <span className="text-sm">
+                                  このステップは待機中です
+                                </span>
+                              </div>
+                              {stage.description && (
+                                <div className="bg-gray-50 border border-gray-200 p-3 rounded-lg">
+                                  <div className="text-xs font-medium text-gray-700 mb-1">
+                                    ステップ概要:
+                                  </div>
+                                  <div className="text-sm text-gray-600">
+                                    {stage.description}
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
                       </div>
                     </details>
                   </div>
-                );
-              })}
+                  );
+                });
+              })()}
             </div>
           </div>
         )}

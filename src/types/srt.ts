@@ -23,6 +23,7 @@ export interface ProcessingStage {
   status: 'pending' | 'processing' | 'completed' | 'error'
   result?: string
   error?: string
+  description?: string
 }
 
 export interface AudioFile {
