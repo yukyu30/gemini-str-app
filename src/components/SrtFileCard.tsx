@@ -11,7 +11,6 @@ import {
   CheckCircle,
   AlertCircle,
   Loader2,
-  Eye,
 } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -44,7 +43,7 @@ const SrtFileCard = ({ audioFile, onUpdate, onDelete }: SrtFileCardProps) => {
   const [showSettings, setShowSettings] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
   const [showGeminiDebug, setShowGeminiDebug] = useState(false);
-  const [showPreview, setShowPreview] = useState(false);
+  const [activeTab, setActiveTab] = useState<'result' | 'preview'>('result');
   const { toast } = useToast();
 
   const saveFileTemporarily = async (file: File): Promise<string> => {
@@ -599,16 +598,6 @@ const SrtFileCard = ({ audioFile, onUpdate, onDelete }: SrtFileCardProps) => {
                     辞書CSVダウンロード
                   </Button>
                 )}
-              {audioFile.subtitles && audioFile.subtitles.length > 0 && (
-                <Button
-                  onClick={() => setShowPreview(!showPreview)}
-                  variant="secondary"
-                  className="flex items-center gap-2"
-                >
-                  <Eye className="h-4 w-4" />
-                  {showPreview ? 'プレビューを隠す' : '字幕プレビュー'}
-                </Button>
-              )}
               {!audioFile.settings.enableAdvancedProcessing && (
                 <Button
                   onClick={() => setShowGeminiDebug(!showGeminiDebug)}
@@ -644,58 +633,86 @@ const SrtFileCard = ({ audioFile, onUpdate, onDelete }: SrtFileCardProps) => {
           )}
         </div>
 
-        {/* Result Section */}
+        {/* Tabbed Result and Preview Section */}
         {audioFile.status === 'completed' && audioFile.result && (
           <div className="space-y-3">
-            <div className="flex justify-between items-center">
-              <h4 className="font-medium">SRT字幕結果</h4>
-              <div className="flex gap-2">
-                <Button
-                  onClick={copyToClipboard}
-                  variant="outline"
-                  size="sm"
-                  className="flex items-center gap-2"
+            {/* Tab Navigation */}
+            <div className="border-b border-border">
+              <div className="flex space-x-8">
+                <button
+                  onClick={() => setActiveTab('result')}
+                  className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
+                    activeTab === 'result'
+                      ? 'border-primary text-primary'
+                      : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground'
+                  }`}
                 >
-                  <Copy className="h-3 w-3" />
-                  コピー
-                </Button>
+                  SRT字幕結果
+                </button>
+                {audioFile.subtitles && audioFile.subtitles.length > 0 && (
+                  <button
+                    onClick={() => setActiveTab('preview')}
+                    className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
+                      activeTab === 'preview'
+                        ? 'border-primary text-primary'
+                        : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground'
+                    }`}
+                  >
+                    字幕プレビュー
+                  </button>
+                )}
               </div>
             </div>
 
-            {copySuccess && (
-              <div className="text-sm text-green-600 bg-green-50 p-2 rounded">
-                クリップボードにコピーしました
+            {/* Tab Content */}
+            {activeTab === 'result' && (
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={copyToClipboard}
+                      variant="outline"
+                      size="sm"
+                      className="flex items-center gap-2"
+                    >
+                      <Copy className="h-3 w-3" />
+                      コピー
+                    </Button>
+                  </div>
+                </div>
+
+                {copySuccess && (
+                  <div className="text-sm text-green-600 bg-green-50 p-2 rounded">
+                    クリップボードにコピーしました
+                  </div>
+                )}
+
+                <div className="bg-muted p-4 rounded-md max-h-96 overflow-y-auto">
+                  <pre className="text-sm whitespace-pre-wrap font-mono">
+                    {audioFile.result}
+                  </pre>
+                </div>
+
+                <div className="text-sm text-muted-foreground">
+                  {audioFile.subtitles
+                    ? `合計 ${audioFile.subtitles.length} 個の字幕が生成されました`
+                    : audioFile.srtValidation && !audioFile.srtValidation.isValid
+                      ? 'SRT形式の解析に失敗しましたが、生のテキストを表示・ダウンロードできます'
+                      : 'テキストが生成されました'}
+                </div>
               </div>
             )}
 
-            <div className="bg-muted p-4 rounded-md max-h-96 overflow-y-auto">
-              <pre className="text-sm whitespace-pre-wrap font-mono">
-                {audioFile.result}
-              </pre>
-            </div>
-
-            <div className="text-sm text-muted-foreground">
-              {audioFile.subtitles
-                ? `合計 ${audioFile.subtitles.length} 個の字幕が生成されました`
-                : audioFile.srtValidation && !audioFile.srtValidation.isValid
-                  ? 'SRT形式の解析に失敗しましたが、生のテキストを表示・ダウンロードできます'
-                  : 'テキストが生成されました'}
-            </div>
+            {activeTab === 'preview' && audioFile.subtitles && audioFile.subtitles.length > 0 && (
+              <div className="space-y-3">
+                <AudioSubtitlePreview
+                  audioFile={audioFile.file}
+                  subtitles={audioFile.subtitles}
+                />
+              </div>
+            )}
           </div>
         )}
-
-        {/* Subtitle Preview Section */}
-        {audioFile.status === 'completed' && 
-          showPreview && 
-          audioFile.subtitles && 
-          audioFile.subtitles.length > 0 && (
-            <div className="space-y-3">
-              <AudioSubtitlePreview
-                audioFile={audioFile.file}
-                subtitles={audioFile.subtitles}
-              />
-            </div>
-          )}
 
         {/* Gemini Debug Section (for standard mode) */}
         {audioFile.status === 'completed' &&

@@ -89,7 +89,7 @@ describe('SrtFileCard Preview Integration', () => {
     mockAudio.paused = true
   })
 
-  it('shows preview button when subtitles are available', () => {
+  it('shows preview tab when subtitles are available', () => {
     render(
       <SrtFileCard
         audioFile={mockAudioFile}
@@ -99,9 +99,10 @@ describe('SrtFileCard Preview Integration', () => {
     )
 
     expect(screen.getByText('字幕プレビュー')).toBeInTheDocument()
+    expect(screen.getByText('SRT字幕結果')).toBeInTheDocument()
   })
 
-  it('does not show preview button when no subtitles are available', () => {
+  it('does not show preview tab when no subtitles are available', () => {
     const audioFileWithoutSubtitles = {
       ...mockAudioFile,
       subtitles: undefined,
@@ -116,9 +117,10 @@ describe('SrtFileCard Preview Integration', () => {
     )
 
     expect(screen.queryByText('字幕プレビュー')).not.toBeInTheDocument()
+    expect(screen.getByText('SRT字幕結果')).toBeInTheDocument()
   })
 
-  it('does not show preview button when audio file is not completed', () => {
+  it('does not show tabs when audio file is not completed', () => {
     const processingAudioFile = {
       ...mockAudioFile,
       status: 'processing' as const,
@@ -133,9 +135,10 @@ describe('SrtFileCard Preview Integration', () => {
     )
 
     expect(screen.queryByText('字幕プレビュー')).not.toBeInTheDocument()
+    expect(screen.queryByText('SRT字幕結果')).not.toBeInTheDocument()
   })
 
-  it('toggles preview display when preview button is clicked', async () => {
+  it('switches between result and preview tabs when clicked', async () => {
     render(
       <SrtFileCard
         audioFile={mockAudioFile}
@@ -144,35 +147,38 @@ describe('SrtFileCard Preview Integration', () => {
       />
     )
 
-    const previewButton = screen.getByText('字幕プレビュー')
-    
-    // Initially preview is not shown
-    expect(screen.queryByText('字幕プレビュー')).toBeInTheDocument()
+    // Initially should show result tab content
+    expect(screen.getByText(/Hello world/)).toBeInTheDocument()
+    expect(screen.getByText(/This is a test subtitle/)).toBeInTheDocument()
     expect(screen.queryByTestId('subtitle-display')).not.toBeInTheDocument()
-
-    // Click to show preview
-    fireEvent.click(previewButton)
-
+    
+    // Click preview tab
+    const previewTabs = screen.getAllByText('字幕プレビュー')
+    fireEvent.click(previewTabs[0])
+    
     await waitFor(() => {
       expect(screen.getByTestId('subtitle-display')).toBeInTheDocument()
-      expect(screen.getByText('プレビューを隠す')).toBeInTheDocument()
     })
-
+    
     // Check that AudioSubtitlePreview component is rendered
     expect(screen.getByRole('button', { name: /play/i })).toBeInTheDocument()
     expect(screen.getByText('Hello world')).toBeInTheDocument()
     expect(screen.getByText('This is a test subtitle')).toBeInTheDocument()
-
-    // Click to hide preview
-    fireEvent.click(screen.getByText('プレビューを隠す'))
-
+    
+    // Result content should be hidden  
+    expect(screen.queryByText(/00:00:00,000 --> 00:00:03,000/)).not.toBeInTheDocument()
+    
+    // Click back to result tab
+    const resultTab = screen.getByText('SRT字幕結果')
+    fireEvent.click(resultTab)
+    
     await waitFor(() => {
+      expect(screen.getByText(/00:00:00,000 --> 00:00:03,000/)).toBeInTheDocument()
       expect(screen.queryByTestId('subtitle-display')).not.toBeInTheDocument()
-      expect(screen.getByText('字幕プレビュー')).toBeInTheDocument()
     })
   })
 
-  it('maintains other functionality while preview is shown', async () => {
+  it('maintains other functionality while preview tab is active', async () => {
     render(
       <SrtFileCard
         audioFile={mockAudioFile}
@@ -181,14 +187,15 @@ describe('SrtFileCard Preview Integration', () => {
       />
     )
 
-    // Show preview
-    fireEvent.click(screen.getByText('字幕プレビュー'))
+    // Switch to preview tab
+    const previewTabs = screen.getAllByText('字幕プレビュー')
+    fireEvent.click(previewTabs[0])
 
     await waitFor(() => {
       expect(screen.getByTestId('subtitle-display')).toBeInTheDocument()
     })
 
-    // Other buttons should still be functional
+    // Action buttons should still be accessible
     expect(screen.getByText('SRTダウンロード')).toBeInTheDocument()
     expect(screen.getByText('Geminiデバッグを表示')).toBeInTheDocument()
     expect(screen.getByText('再生成')).toBeInTheDocument()
@@ -250,15 +257,15 @@ describe('SrtFileCard Preview Integration', () => {
       />
     )
 
-    // Show preview
-    fireEvent.click(screen.getByText('字幕プレビュー'))
+    // Click preview tab (get the first one which is the tab button)
+    const previewTabs = screen.getAllByText('字幕プレビュー')
+    fireEvent.click(previewTabs[0])
 
     await waitFor(() => {
       expect(screen.getByTestId('subtitle-display')).toBeInTheDocument()
     })
 
     // Verify AudioSubtitlePreview receives correct data
-    expect(screen.getByText('字幕プレビュー')).toBeInTheDocument() // Component title
     expect(screen.getByText('字幕一覧')).toBeInTheDocument() // Subtitle list header
     
     // Verify subtitle content is displayed
