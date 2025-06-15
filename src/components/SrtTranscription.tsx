@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { AlertCircle, FileAudio, Settings as SettingsIcon, Save, RotateCcw } from 'lucide-react'
+import { AlertCircle, FileAudio, Settings as SettingsIcon, Save, RotateCcw, History, Trash2 } from 'lucide-react'
 
 import SrtDropZone from './SrtDropZone'
 import SrtFileCard from './SrtFileCard'
@@ -11,18 +11,31 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { AudioFile, DEFAULT_SRT_SETTINGS, SrtSettings } from '@/types/srt'
 import { GEMINI_MODELS } from '@/constants/prompts'
 import { settingsStorage } from '@/lib/settings-storage'
+import { transcriptionHistory, TranscriptionHistoryItem } from '@/lib/transcription-history'
+import { formatFileSize } from '@/lib/utils'
 
 const SrtTranscription = () => {
   const [audioFiles, setAudioFiles] = useState<AudioFile[]>([])
+  const [showHistory, setShowHistory] = useState(false)
+  const [historyItems, setHistoryItems] = useState<TranscriptionHistoryItem[]>([])
   const [globalError, setGlobalError] = useState('')
   const [globalSettings, setGlobalSettings] = useState<SrtSettings>(DEFAULT_SRT_SETTINGS)
   const [settingsSaved, setSettingsSaved] = useState(false)
   const [showGlobalSettings, setShowGlobalSettings] = useState(false)
 
-  // Load default settings on component mount
+  // Load default settings and history on component mount
   useEffect(() => {
     const savedSettings = settingsStorage.loadDefaultSettings()
     setGlobalSettings(savedSettings)
+    
+    const history = transcriptionHistory.loadHistory()
+    setHistoryItems(history)
+    
+    // 完了した履歴アイテムがある場合、自動的に復元するか確認
+    const completedItems = history.filter(item => item.status === 'completed')
+    if (completedItems.length > 0) {
+      console.log(`Found ${completedItems.length} completed transcriptions in history`)
+    }
   }, [])
 
   const handleFilesAdded = (files: File[]) => {
@@ -42,11 +55,23 @@ const SrtTranscription = () => {
   }
 
   const handleFileUpdate = (id: string, updates: Partial<AudioFile>) => {
-    setAudioFiles(prev => 
-      prev.map(file => 
+    setAudioFiles(prev => {
+      const updatedFiles = prev.map(file => 
         file.id === id ? { ...file, ...updates } : file
       )
-    )
+      
+      // 更新されたファイルを履歴に保存
+      const updatedFile = updatedFiles.find(file => file.id === id)
+      if (updatedFile) {
+        transcriptionHistory.saveItem(updatedFile)
+        
+        // 履歴を更新
+        const newHistory = transcriptionHistory.loadHistory()
+        setHistoryItems(newHistory)
+      }
+      
+      return updatedFiles
+    })
   }
 
   const handleFileDelete = (id: string) => {
@@ -112,6 +137,32 @@ const SrtTranscription = () => {
     setSettingsSaved(false)
   }
 
+  const restoreFromHistory = (historyItem: TranscriptionHistoryItem) => {
+    const restoredFile = transcriptionHistory.restoreItem(historyItem)
+    if (restoredFile) {
+      setAudioFiles(prev => {
+        // 既に同じIDのファイルがあるかチェック
+        const exists = prev.some(file => file.id === restoredFile.id)
+        if (!exists) {
+          return [...prev, restoredFile]
+        }
+        return prev
+      })
+      setShowHistory(false)
+    }
+  }
+
+  const removeFromHistory = (id: string) => {
+    transcriptionHistory.removeItem(id)
+    const newHistory = transcriptionHistory.loadHistory()
+    setHistoryItems(newHistory)
+  }
+
+  const clearAllHistory = () => {
+    transcriptionHistory.clearHistory()
+    setHistoryItems([])
+  }
+
   const statusCounts = getStatusCounts()
 
   return (
@@ -124,6 +175,39 @@ const SrtTranscription = () => {
         <p className="text-muted-foreground">
           音声ファイルから高品質なSRT字幕ファイルを自動生成
         </p>
+        
+        {/* Quick restore from recent history */}
+        {historyItems.filter(item => item.status === 'completed').slice(0, 3).length > 0 && audioFiles.length === 0 && (
+          <Card className="mt-4">
+            <CardContent className="pt-4">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-sm font-medium">最近の変換結果</span>
+                <Button variant="ghost" size="sm" onClick={() => setShowHistory(true)}>
+                  すべて表示
+                </Button>
+              </div>
+              <div className="space-y-2">
+                {historyItems.filter(item => item.status === 'completed').slice(0, 3).map((item) => (
+                  <div key={item.id} className="flex items-center justify-between p-2 bg-muted/50 rounded">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{item.fileName}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(item.timestamp).toLocaleDateString('ja-JP')}
+                      </p>
+                    </div>
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => restoreFromHistory(item)}
+                    >
+                      復元
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       <SrtDropZone 
@@ -283,9 +367,90 @@ const SrtTranscription = () => {
                     完了ファイルを削除 ({statusCounts.completed})
                   </Button>
                 )}
+                <Button 
+                  variant="outline" 
+                  onClick={() => setShowHistory(!showHistory)}
+                  className="flex items-center gap-2"
+                >
+                  <History className="h-4 w-4" />
+                  変換履歴 ({historyItems.length})
+                </Button>
               </div>
             </CardContent>
           </Card>
+
+          {/* History Section */}
+          {showHistory && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <span className="flex items-center gap-2">
+                    <History className="h-5 w-5" />
+                    変換履歴
+                  </span>
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={clearAllHistory}
+                      className="flex items-center gap-2"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      全て削除
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => setShowHistory(false)}
+                    >
+                      閉じる
+                    </Button>
+                  </div>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {historyItems.length === 0 ? (
+                  <p className="text-muted-foreground text-center py-4">
+                    変換履歴がありません
+                  </p>
+                ) : (
+                  <div className="space-y-2 max-h-96 overflow-y-auto">
+                    {historyItems.map((item) => (
+                      <div key={item.id} className="flex items-center justify-between p-3 border rounded-md">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">{item.fileName}</p>
+                          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                            <span>{formatFileSize(item.fileSize)}</span>
+                            <Badge variant={item.status === 'completed' ? 'success' : item.status === 'error' ? 'destructive' : 'secondary'}>
+                              {item.status === 'completed' ? '完了' : item.status === 'error' ? 'エラー' : item.status}
+                            </Badge>
+                            <span>{new Date(item.timestamp).toLocaleString('ja-JP')}</span>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          {item.status === 'completed' && (
+                            <Button 
+                              size="sm" 
+                              onClick={() => restoreFromHistory(item)}
+                            >
+                              復元
+                            </Button>
+                          )}
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => removeFromHistory(item.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {/* File List */}
           <div className="space-y-4">

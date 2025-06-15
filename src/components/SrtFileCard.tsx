@@ -196,6 +196,9 @@ const SrtFileCard = ({ audioFile, onUpdate, onDelete }: SrtFileCardProps) => {
           <div className="space-y-1 flex-1 min-w-0">
             <CardTitle className="text-base font-medium truncate">
               {audioFile.file.name}
+              {audioFile.file.size === 0 && (
+                <span className="ml-2 text-xs text-muted-foreground">(履歴から復元)</span>
+              )}
             </CardTitle>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <span>{formatFileSize(audioFile.file.size)}</span>
