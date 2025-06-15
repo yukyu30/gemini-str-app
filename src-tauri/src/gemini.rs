@@ -131,11 +131,17 @@ impl GeminiClient {
             .await?;
 
         if !response.status().is_success() {
+            let status = response.status();
             let error_text = response.text().await?;
-            return Err(format!("File upload failed: {}", error_text).into());
+            eprintln!("File upload failed with status {}: {}", status, error_text);
+            return Err(format!("File upload failed ({}): {}", status, error_text).into());
         }
 
-        let upload_response: FileUploadResponse = response.json().await?;
+        let response_text = response.text().await?;
+        eprintln!("Upload response: {}", response_text);
+        
+        let upload_response: FileUploadResponse = serde_json::from_str(&response_text)
+            .map_err(|e| format!("Failed to parse upload response: {} - Response: {}", e, response_text))?;
         Ok(upload_response.file)
     }
 
@@ -166,11 +172,17 @@ impl GeminiClient {
             .await?;
 
         if !response.status().is_success() {
+            let status = response.status();
             let error_text = response.text().await?;
-            return Err(format!("Content generation failed: {}", error_text).into());
+            eprintln!("Content generation failed with status {}: {}", status, error_text);
+            return Err(format!("Content generation failed ({}): {}", status, error_text).into());
         }
 
-        let generate_response: GenerateContentResponse = response.json().await?;
+        let response_text = response.text().await?;
+        eprintln!("Generate content response: {}", response_text);
+        
+        let generate_response: GenerateContentResponse = serde_json::from_str(&response_text)
+            .map_err(|e| format!("Failed to parse generation response: {} - Response: {}", e, response_text))?;
         
         if let Some(candidate) = generate_response.candidates.first() {
             if let Some(Part::Text { text }) = candidate.content.parts.first() {

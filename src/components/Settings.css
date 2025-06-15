@@ -26,6 +26,38 @@
   color: #555;
 }
 
+.api-key-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem;
+  background-color: #d4edda;
+  border: 1px solid #c3e6cb;
+  border-radius: 4px;
+  margin-bottom: 1rem;
+}
+
+.status-text {
+  color: #155724;
+  font-weight: 500;
+  font-family: monospace;
+}
+
+.change-key-btn {
+  padding: 0.5rem 1rem;
+  background-color: #007acc;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background-color 0.2s;
+}
+
+.change-key-btn:hover {
+  background-color: #005a9e;
+}
+
 .input-group {
   display: flex;
   position: relative;
@@ -99,4 +131,28 @@
 .settings-form button[type="submit"]:disabled {
   background-color: #ccc;
   cursor: not-allowed;
+}
+
+.debug-section {
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e9ecef;
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.debug-btn {
+  padding: 0.5rem 1rem;
+  background-color: #6c757d;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: background-color 0.2s;
+}
+
+.debug-btn:hover {
+  background-color: #545b62;
 }

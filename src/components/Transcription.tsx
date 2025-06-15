@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import AudioUpload from './AudioUpload'
 import { TRANSCRIPTION_PROMPTS, GEMINI_MODELS } from '../constants/prompts'
+import { storageUtils } from '../utils/storage'
 import './Transcription.css'
 
 type TranscriptionType = 'basic' | 'srt' | 'summary'
@@ -69,14 +70,31 @@ const Transcription = () => {
   }
 
   const saveFileTemporarily = async (file: File): Promise<string> => {
-    // In a real implementation, this would save the file to a temp location
-    // For now, we'll use the file name as a placeholder
-    // In Tauri, you'd typically use the fs plugin to save to a temp directory
-    return file.name
+    // Convert file to array buffer
+    const arrayBuffer = await file.arrayBuffer()
+    const uint8Array = new Uint8Array(arrayBuffer)
+    
+    // Save to temporary file using Tauri command
+    const tempFilePath = await invoke<string>('save_temp_file', {
+      fileData: Array.from(uint8Array),
+      fileName: file.name
+    })
+    
+    return tempFilePath
   }
 
   const startTranscription = async () => {
     if (!state.file) return
+
+    // Check API key from localStorage first
+    const apiKey = storageUtils.getApiKey()
+    if (!apiKey) {
+      setState(prev => ({
+        ...prev,
+        error: 'API key not found. Please set your Gemini API key in settings.'
+      }))
+      return
+    }
 
     setState(prev => ({
       ...prev,
@@ -97,7 +115,8 @@ const Transcription = () => {
       const result = await invoke<string>('transcribe_audio', {
         filePath: tempFilePath,
         prompt,
-        model: state.selectedModel
+        model: state.selectedModel,
+        apiKey
       })
 
       setState(prev => ({

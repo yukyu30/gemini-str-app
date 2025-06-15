@@ -1,6 +1,7 @@
 use keyring::Entry;
 use std::path::Path;
 use tokio::fs;
+use tauri::{Manager, AppHandle};
 
 mod gemini;
 use gemini::GeminiClient;
@@ -32,7 +33,20 @@ async fn set_api_key(api_key: String) -> Result<bool, String> {
     match entry.set_password(&api_key) {
         Ok(_) => {
             println!("DEBUG: Successfully saved API key to keyring");
-            Ok(true)
+            
+            // Verify the save immediately
+            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+            match entry.get_password() {
+                Ok(saved_key) => {
+                    println!("DEBUG: Verification read successful, length: {}", saved_key.len());
+                    Ok(true)
+                },
+                Err(e) => {
+                    println!("DEBUG: Verification read failed: {}", e);
+                    // Still return success since the save operation succeeded
+                    Ok(true)
+                }
+            }
         },
         Err(e) => {
             println!("DEBUG: Failed to save API key: {}", e);
@@ -113,17 +127,7 @@ async fn debug_keyring() -> Result<String, String> {
 }
 
 #[tauri::command]
-async fn transcribe_audio(file_path: String, prompt: String, model: Option<String>) -> Result<String, String> {
-    // Get API key
-    let entry = Entry::new(SERVICE_NAME, API_KEY_ENTRY)
-        .map_err(|e| format!("Failed to create keyring entry: {}", e))?;
-    
-    let api_key = match entry.get_password() {
-        Ok(password) => password,
-        Err(keyring::Error::NoEntry) => return Err("API key not found. Please set your Gemini API key in settings.".to_string()),
-        Err(e) => return Err(format!("Failed to retrieve API key: {}", e)),
-    };
-
+async fn transcribe_audio(file_path: String, prompt: String, model: Option<String>, api_key: String) -> Result<String, String> {
     if api_key.trim().is_empty() {
         return Err("API key is empty. Please set your Gemini API key in settings.".to_string());
     }
