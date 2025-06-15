@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
-import { TRANSCRIPTION_PROMPTS, GEMINI_MODELS } from '../constants/prompts'
+import { SRT_PROMPT, GEMINI_MODELS } from '../constants/prompts'
 import { storageUtils } from '../utils/storage'
 import './AudioFileCard.css'
 
@@ -36,17 +36,9 @@ const AudioFileCard = ({ fileData, onUpdate, onDelete }: AudioFileCardProps) => 
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
   }
 
-  const getPromptForType = (type: TranscriptionType): string => {
-    switch (type) {
-      case 'basic':
-        return TRANSCRIPTION_PROMPTS.BASIC_TRANSCRIPT
-      case 'srt':
-        return TRANSCRIPTION_PROMPTS.SRT_FORMAT()
-      case 'summary':
-        return TRANSCRIPTION_PROMPTS.SUMMARY
-      default:
-        return TRANSCRIPTION_PROMPTS.BASIC_TRANSCRIPT
-    }
+  const getPromptForType = (_type: TranscriptionType): string => {
+    // このコンポーネントはSRT専用に変更されました
+    return SRT_PROMPT()
   }
 
   const saveFileTemporarily = async (file: File): Promise<string> => {

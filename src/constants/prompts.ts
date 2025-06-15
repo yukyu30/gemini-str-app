@@ -1,7 +1,5 @@
-export const TRANSCRIPTION_PROMPTS = {
-  BASIC_TRANSCRIPT: "Generate a transcript of the speech.",
-  
-  SRT_FORMAT: (duration?: string) => `提供する音声（または動画）ファイルの内容を、高品質なSRT（SubRip Text）ファイル形式で文字起こししてください。${duration ? `\n\n**音声ファイルの長さ: ${duration}**` : ''}
+// SRT字幕専用プロンプト
+export const SRT_PROMPT = (duration?: string, maxCharsPerSubtitle: number = 20, enableSpeakerDetection: boolean = true) => `提供する音声（または動画）ファイルの内容を、高品質なSRT（SubRip Text）ファイル形式で文字起こししてください。${duration ? `\n\n**音声ファイルの長さ: ${duration}**` : ''}
 
 # 1. SRTファイルの基本構造について
 
@@ -33,17 +31,15 @@ export const TRANSCRIPTION_PROMPTS = {
     - 音声の発話タイミングと字幕の表示タイミングを正確に一致させてください。
 
 2.  **字幕テキストの編集ルール**
-    - **文字数制限:** 1つの字幕ブロック（通し番号1つにつき）のテキストは、**20文字以内**を目安にしてください。長くなる場合は、意味の区切りが良い箇所で改行するなど、読みやすさを最優先してください。
-    - **フィラーワードの削除:** 会話中の「えーっと」「あのー」「なんか」といった、意味を持たないフィラーワードはすべて削除し、自然で聞き取りやすい文章にしてください。
-    - **話者の区別:** 会話に複数の話者がいる場合は、各字幕の先頭に話者名を明記してください。（例: \`アオイ: \`、\`ユーザー: \`）`,
+    - **文字数制限:** 1つの字幕ブロック（通し番号1つにつき）のテキストは、**${maxCharsPerSubtitle}文字以内**を目安にしてください。長くなる場合は、意味の区切りが良い箇所で改行するなど、読みやすさを最優先してください。
+    - **フィラーワードの削除:** 会話中の「えーっと」「あのー」「なんか」といった、意味を持たないフィラーワードはすべて削除し、自然で聞き取りやすい文章にしてください。${enableSpeakerDetection ? '\n    - **話者の区別:** 会話に複数の話者がいる場合は、各字幕の先頭に話者名を明記してください。（例: `アオイ: `、`ユーザー: `）' : '\n    - **話者の区別:** 話者名は付けず、純粋な発話内容のみを記録してください。'}
 
-  TIME_RANGE_TRANSCRIPT: (startTime: string, endTime: string) => 
-    `Provide a transcript of the speech from ${startTime} to ${endTime}.`,
-    
-  SUMMARY: "Please summarize the audio.",
-  
-  DESCRIPTION: "Describe this audio clip"
-} as const;
+3.  **品質要求**
+    - 字幕として読みやすく、視聴者にとって理解しやすい文章にしてください。
+    - 音声が不明瞭な部分は [不明瞭] として記録してください。
+    - 無音部分や間は適切に反映し、字幕の切り替えタイミングを自然にしてください。
+
+**最終的にSRT形式のテキストのみを出力してください。説明や前置きは不要です。**`;
 
 export const SUPPORTED_AUDIO_FORMATS = [
   'audio/wav',
