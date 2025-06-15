@@ -1,5 +1,5 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import { vi, describe, it, expect, beforeEach, Mock } from 'vitest'
+import { vi, describe, it, expect, beforeEach } from 'vitest'
 import { invoke } from '@tauri-apps/api/core'
 import SrtFileCard from './SrtFileCard'
 import { useToast } from '@/hooks/use-toast'

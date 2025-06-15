@@ -127,8 +127,8 @@ describe('Stage Merger Logic', () => {
 
     const result = mergeStagesWithDefaults(actualStages)
     
-    expect(result.initialTranscription.result).toBe('Full transcription text here...')
-    expect(result.topicAnalysis.error).toBe('Failed to analyze topic')
+    expect((result.initialTranscription as any).result).toBe('Full transcription text here...')
+    expect((result.topicAnalysis as any).error).toBe('Failed to analyze topic')
     expect(result.topicAnalysis.status).toBe('error')
   })
 
@@ -167,6 +167,6 @@ describe('Stage Merger Logic', () => {
     expect(result.finalTranscription.status).toBe('pending')
     
     // Completed stage should have result
-    expect(result.dictionaryCreation.result).toBe('Dictionary content here')
+    expect((result.dictionaryCreation as any).result).toBe('Dictionary content here')
   })
 })

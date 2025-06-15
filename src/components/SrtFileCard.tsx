@@ -543,7 +543,7 @@ const SrtFileCard = ({ audioFile, onUpdate, onDelete }: SrtFileCardProps) => {
                     生成されたテキストにSRT形式の問題がありますが、内容の表示とダウンロードは可能です。
                   </p>
                   <details className="mt-2">
-                    <summary className="text-xs text-orange-600 cursor-pointer hover:text-orange-800">
+                    <summary className="text-xs text-orange-600 cursor-pointer hover:text-orange-800 list-none">
                       詳細を表示
                     </summary>
                     <ul className="text-xs text-orange-600 mt-1 ml-4">
@@ -1060,7 +1060,7 @@ const SrtFileCard = ({ audioFile, onUpdate, onDelete }: SrtFileCardProps) => {
 
               <div className="border rounded-lg bg-card">
                 <details className="group">
-                  <summary className="cursor-pointer p-4 hover:bg-muted/30 flex items-center gap-3">
+                  <summary className="cursor-pointer list-none p-4 hover:bg-muted/30 flex items-center gap-3">
                     <div className="flex items-center gap-2">
                       <CheckCircle className="h-4 w-4 text-green-500" />
                       <span className="font-medium text-sm">
