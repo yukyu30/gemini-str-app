@@ -1,5 +1,7 @@
 // SRT字幕専用プロンプト
-export const SRT_PROMPT = (duration?: string, maxCharsPerSubtitle: number = 20, enableSpeakerDetection: boolean = true) => `提供する音声（または動画）ファイルの内容を、高品質なSRT（SubRip Text）ファイル形式で文字起こししてください。${duration ? `\n\n**音声ファイルの長さ: ${duration}**` : ''}
+export const SRT_PROMPT = (durationMs?: number, maxCharsPerSubtitle: number = 20, enableSpeakerDetection: boolean = true) => {
+  const durationText = durationMs ? `${Math.floor(durationMs / 60000)}分${Math.floor((durationMs % 60000) / 1000)}秒 (${durationMs}ms)` : undefined;
+  return `提供する音声（または動画）ファイルの内容を、高品質なSRT（SubRip Text）ファイル形式で文字起こししてください。${durationText ? `\n\n**音声ファイルの長さ: ${durationText}**\n音声の長さを考慮して、適切な字幕の分割と表示タイミングを決定してください。` : ''}
 
 # 1. SRTファイルの基本構造について
 
@@ -40,6 +42,7 @@ export const SRT_PROMPT = (duration?: string, maxCharsPerSubtitle: number = 20, 
     - 無音部分や間は適切に反映し、字幕の切り替えタイミングを自然にしてください。
 
 **最終的にSRT形式のテキストのみを出力してください。説明や前置きは不要です。**`;
+};
 
 export const SUPPORTED_AUDIO_FORMATS = [
   'audio/wav',
@@ -96,7 +99,9 @@ export const DICTIONARY_CREATION_PROMPT = (topic: string) => `${topic}に出て�
 出力はCSVで、CSVだけを納品してください`;
 
 // 4段階目: 最終SRT生成用プロンプト（辞書付き）
-export const FINAL_SRT_PROMPT = (duration?: string, maxCharsPerSubtitle: number = 20, enableSpeakerDetection: boolean = true, dictionary?: string) => `提供する音声（または動画）ファイルの内容を、高品質なSRT（SubRip Text）ファイル形式で文字起こししてください。${duration ? `\n\n**音声ファイルの長さ: ${duration}**` : ''}
+export const FINAL_SRT_PROMPT = (durationMs?: number, maxCharsPerSubtitle: number = 20, enableSpeakerDetection: boolean = true, dictionary?: string) => {
+  const durationText = durationMs ? `${Math.floor(durationMs / 60000)}分${Math.floor((durationMs % 60000) / 1000)}秒 (${durationMs}ms)` : undefined;
+  return `提供する音声（または動画）ファイルの内容を、高品質なSRT（SubRip Text）ファイル形式で文字起こししてください。${durationText ? `\n\n**音声ファイルの長さ: ${durationText}**\n音声の長さを考慮して、適切な字幕の分割と表示タイミングを決定してください。` : ''}
 
 ${dictionary ? `\n# 専門用語辞書\n以下の辞書を参考に、専門用語の表記を統一してください：\n\n${dictionary}\n` : ''}
 
@@ -139,6 +144,7 @@ ${dictionary ? `\n# 専門用語辞書\n以下の辞書を参考に、専門用�
     - 無音部分や間は適切に反映し、字幕の切り替えタイミングを自然にしてください。
 
 **最終的にSRT形式のテキストのみを出力してください。説明や前置きは不要です。**`;
+};
 
 export const GEMINI_MODELS = [
   {

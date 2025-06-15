@@ -58,6 +58,34 @@ const SrtFileCard = ({ audioFile, onUpdate, onDelete }: SrtFileCardProps) => {
     return tempFilePath;
   };
 
+  const getAudioDurationMs = async (file: File): Promise<number> => {
+    return new Promise((resolve, reject) => {
+      const audio = new Audio();
+      
+      const handleLoadedMetadata = () => {
+        const durationMs = Math.round(audio.duration * 1000);
+        cleanup();
+        resolve(durationMs);
+      };
+
+      const handleError = () => {
+        cleanup();
+        reject(new Error('Failed to load audio metadata'));
+      };
+
+      const cleanup = () => {
+        audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
+        audio.removeEventListener('error', handleError);
+        URL.revokeObjectURL(audio.src);
+      };
+
+      audio.addEventListener('loadedmetadata', handleLoadedMetadata);
+      audio.addEventListener('error', handleError);
+      audio.src = URL.createObjectURL(file);
+      audio.load();
+    });
+  };
+
   const startTranscription = async () => {
     const apiKey = storageUtils.getApiKey();
     if (!apiKey) {
@@ -79,29 +107,40 @@ const SrtFileCard = ({ audioFile, onUpdate, onDelete }: SrtFileCardProps) => {
     onUpdate(audioFile.id, {
       status: 'processing',
       error: undefined,
-      progress: 'ステップ 1/5: ファイルを一時保存中... (数秒)',
+      progress: 'ステップ 1/6: ファイルを一時保存中... (数秒)',
     });
 
     try {
       const tempFilePath = await saveFileTemporarily(audioFile.file);
 
       onUpdate(audioFile.id, {
-        progress: 'ステップ 2/5: プロンプトを準備中...',
+        progress: 'ステップ 2/6: 音声ファイルの長さを取得中...',
+      });
+
+      let audioDurationMs: number | undefined;
+      try {
+        audioDurationMs = await getAudioDurationMs(audioFile.file);
+      } catch (error) {
+        console.warn('Could not get audio duration:', error);
+      }
+
+      onUpdate(audioFile.id, {
+        progress: 'ステップ 3/6: プロンプトを準備中...',
       });
 
       const prompt = SRT_PROMPT(
-        undefined,
+        audioDurationMs,
         audioFile.settings.maxCharsPerSubtitle,
         audioFile.settings.enableSpeakerDetection
       );
 
       onUpdate(audioFile.id, {
-        progress: 'ステップ 3/5: Gemini APIに音声ファイルを送信中...',
+        progress: 'ステップ 4/6: Gemini APIに音声ファイルを送信中...',
       });
       await new Promise((resolve) => setTimeout(resolve, 500));
 
       onUpdate(audioFile.id, {
-        progress: 'ステップ 4/5: AI音声解析・SRT字幕生成中... (1-3分)',
+        progress: 'ステップ 5/6: AI音声解析・SRT字幕生成中... (1-3分)',
       });
 
       const result = await invoke<string>('transcribe_audio', {
@@ -112,7 +151,7 @@ const SrtFileCard = ({ audioFile, onUpdate, onDelete }: SrtFileCardProps) => {
       });
 
       onUpdate(audioFile.id, {
-        progress: 'ステップ 5/5: SRT形式の検証と最終化中...',
+        progress: 'ステップ 6/6: SRT形式の検証と最終化中...',
       });
 
       // Parse and validate SRT
@@ -139,15 +178,26 @@ const SrtFileCard = ({ audioFile, onUpdate, onDelete }: SrtFileCardProps) => {
     onUpdate(audioFile.id, {
       status: 'processing',
       error: undefined,
-      progress: 'ステップ 1/6: ファイルを一時保存中...',
+      progress: 'ステップ 1/7: ファイルを一時保存中...',
     });
 
     try {
       const tempFilePath = await saveFileTemporarily(audioFile.file);
 
+      onUpdate(audioFile.id, {
+        progress: 'ステップ 2/7: 音声ファイルの長さを取得中...',
+      });
+
+      let audioDurationMs: number | undefined;
+      try {
+        audioDurationMs = await getAudioDurationMs(audioFile.file);
+      } catch (error) {
+        console.warn('Could not get audio duration:', error);
+      }
+
       // ステップ1: 基本文字起こし
       onUpdate(audioFile.id, {
-        progress: 'ステップ 2/6: 基本文字起こし中... (Gemini 2.0 Flash)',
+        progress: 'ステップ 3/7: 基本文字起こし中... (Gemini 2.0 Flash)',
       });
 
       const initialPrompt = INITIAL_TRANSCRIPTION_PROMPT();
@@ -160,7 +210,7 @@ const SrtFileCard = ({ audioFile, onUpdate, onDelete }: SrtFileCardProps) => {
 
       // ステップ2: トピック分析
       onUpdate(audioFile.id, {
-        progress: 'ステップ 3/6: 会話トピック分析中... (Gemini 2.0 Flash)',
+        progress: 'ステップ 4/7: 会話トピック分析中... (Gemini 2.0 Flash)',
       });
 
       const topicResult = await invoke<string>('analyze_topic', {
@@ -181,7 +231,7 @@ const SrtFileCard = ({ audioFile, onUpdate, onDelete }: SrtFileCardProps) => {
         : 'この会話';
 
       onUpdate(audioFile.id, {
-        progress: `ステップ 4/6: ${mainTopic}に関する用語集を生成中... (Google検索+Gemini 2.0 Flash)`,
+        progress: `ステップ 5/7: ${mainTopic}に関する用語集を生成中... (Google検索+Gemini 2.0 Flash)`,
       });
 
       let dictionary = '';
@@ -212,7 +262,7 @@ const SrtFileCard = ({ audioFile, onUpdate, onDelete }: SrtFileCardProps) => {
 
       // ステップ4: 最終SRT生成
       onUpdate(audioFile.id, {
-        progress: 'ステップ 5/6: 高精度SRT字幕生成中... (Gemini 2.5 Pro)',
+        progress: 'ステップ 6/7: 高精度SRT字幕生成中... (Gemini 2.5 Pro)',
       });
 
       const finalResult = await invoke<string>(
@@ -222,11 +272,12 @@ const SrtFileCard = ({ audioFile, onUpdate, onDelete }: SrtFileCardProps) => {
           dictionary: dictionary,
           maxCharsPerSubtitle: audioFile.settings.maxCharsPerSubtitle,
           enableSpeakerDetection: audioFile.settings.enableSpeakerDetection,
+          durationMs: audioDurationMs,
           apiKey,
         }
       );
 
-      onUpdate(audioFile.id, { progress: 'ステップ 6/6: SRT形式の検証中...' });
+      onUpdate(audioFile.id, { progress: 'ステップ 7/7: SRT形式の検証中...' });
 
       // Parse and validate SRT
       const subtitles = parseSrt(finalResult);
