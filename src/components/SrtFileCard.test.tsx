@@ -226,6 +226,109 @@ describe('SrtFileCard', () => {
       expect(screen.getByText('トピック分析 (Gemini 2.0 Flash)')).toBeInTheDocument()
     })
 
+    it('should NOT show skipped message for actually executed dictionary step', () => {
+      // This test reproduces the exact user scenario:
+      // Dictionary step is executed but shows as "skipped"
+      const advancedAudioFile = {
+        ...mockAudioFile,
+        settings: {
+          ...mockAudioFile.settings,
+          enableAdvancedProcessing: true
+        },
+        status: 'completed' as const,
+        stages: {
+          initialTranscription: {
+            name: '基本文字起こし (Gemini 2.0 Flash)',
+            status: 'completed' as const,
+            result: 'Initial transcription result'
+          },
+          topicAnalysis: {
+            name: 'トピック分析 (Gemini 2.0 Flash)',
+            status: 'completed' as const,
+            result: 'Topic analysis result'
+          },
+          dictionaryCreation: {
+            name: '辞書作成 (Google検索+Gemini 2.0 Flash)',
+            status: 'completed' as const,
+            result: 'Dictionary creation completed'
+          },
+          finalTranscription: {
+            name: '最終字幕生成 (Gemini 2.5 Pro)',
+            status: 'completed' as const,
+            result: 'Final SRT result'
+          }
+        }
+      }
+
+      render(
+        <SrtFileCard 
+          audioFile={advancedAudioFile}
+          onUpdate={mockOnUpdate}
+          onDelete={mockOnDelete}
+        />
+      )
+
+      // Dictionary step should NOT show "skipped" message
+      expect(screen.queryByText('このステップはスキップされました')).not.toBeInTheDocument()
+      
+      // Dictionary step should show completion status
+      expect(screen.getByText('辞書作成 (Google検索+Gemini 2.0 Flash)')).toBeInTheDocument()
+      
+      // Should be able to find completion indicators
+      const completionTexts = screen.getAllByText('完了')
+      expect(completionTexts.length).toBeGreaterThan(0)
+    })
+
+    it('should reproduce user scenario - dictionary step showing as skipped despite being executed', () => {
+      // Trying to reproduce the exact issue the user is experiencing
+      // Perhaps the issue is in how stages are merged when they have different status values
+      const advancedAudioFile = {
+        ...mockAudioFile,
+        settings: {
+          ...mockAudioFile.settings,
+          enableAdvancedProcessing: true
+        },
+        status: 'completed' as const,
+        stages: {
+          // All stages have actual data (this mimics real execution)
+          initialTranscription: {
+            name: '基本文字起こし (Gemini 2.0 Flash)',
+            status: 'completed' as const,
+            result: 'Initial transcription result'
+          },
+          topicAnalysis: {
+            name: 'トピック分析 (Gemini 2.0 Flash)',
+            status: 'completed' as const,
+            result: 'Topic analysis result'
+          },
+          // Dictionary step has data but wrong status - this is the user's problem
+          dictionaryCreation: {
+            name: '辞書作成 (Google検索+Gemini 2.0 Flash)',
+            status: 'pending' as const, // This could be the problem
+            result: 'Dictionary was actually created' // But it has result data
+          },
+          finalTranscription: {
+            name: '最終字幕生成 (Gemini 2.5 Pro)',
+            status: 'completed' as const,
+            result: 'Final SRT result'
+          }
+        }
+      }
+
+      render(
+        <SrtFileCard 
+          audioFile={advancedAudioFile}
+          onUpdate={mockOnUpdate}
+          onDelete={mockOnDelete}
+        />
+      )
+
+      // This test should FAIL if our logic is wrong
+      // If dictionary step has data but status is 'pending', 
+      // it should NOT be marked as skipped
+      expect(screen.queryByText('このステップはスキップされました')).not.toBeInTheDocument()
+    })
+
     it('should display step descriptions for pending stages', () => {
       const advancedAudioFile = {
         ...mockAudioFile,

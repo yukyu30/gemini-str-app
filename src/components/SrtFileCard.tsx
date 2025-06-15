@@ -837,9 +837,12 @@ const SrtFileCard = ({ audioFile, onUpdate, onDelete }: SrtFileCardProps) => {
                     const stageKeys = Object.keys(stages);
                     const currentIndex = stageKeys.indexOf(key);
                     const hasActualStageData = audioFile.stages?.[key as keyof typeof audioFile.stages];
+                    
+                    // データがある場合は絶対にスキップではない（statusに関係なく）
+                    // データがない場合のみスキップ判定を行う
                     const isLikelySkipped =
-                      stage.status === 'pending' &&
                       !hasActualStageData &&
+                      stage.status === 'pending' &&
                       audioFile.stages &&
                       stageKeys.slice(currentIndex + 1).some((laterKey) => {
                         const laterStage =
