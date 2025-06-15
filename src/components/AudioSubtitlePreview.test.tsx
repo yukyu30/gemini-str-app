@@ -211,7 +211,7 @@ describe('AudioSubtitlePreview', () => {
     expect(mockAudio.currentTime).toBe(25)
   })
 
-  it('shows no subtitle when time is outside subtitle ranges', async () => {
+  it('shows no subtitle when time is outside subtitle ranges and not playing', async () => {
     render(
       <AudioSubtitlePreview
         audioFile={mockAudioFile}
@@ -219,8 +219,10 @@ describe('AudioSubtitlePreview', () => {
       />
     )
 
-    // Simulate time after all subtitles
+    // Simulate time after all subtitles when not playing
     mockAudio.currentTime = 15
+    mockAudio.paused = true
+    
     const timeUpdateCallback = mockAudio.addEventListener.mock.calls
       .find(call => call[0] === 'timeupdate')?.[1]
     
@@ -231,8 +233,45 @@ describe('AudioSubtitlePreview', () => {
     }
 
     await waitFor(() => {
-      // Should show the default message when no subtitle is active
+      // Should show the default message when no subtitle is active and not playing
       expect(screen.getByText('字幕を表示するには音声を再生してください')).toBeInTheDocument()
+    })
+  })
+
+  it('hides instruction message when playing audio even if no current subtitle', async () => {
+    render(
+      <AudioSubtitlePreview
+        audioFile={mockAudioFile}
+        subtitles={mockSubtitles}
+      />
+    )
+
+    // Simulate playing audio but outside any subtitle range
+    mockAudio.currentTime = 15 // No subtitle for this time
+    mockAudio.paused = false
+    
+    // Trigger play event to set isPlaying to true
+    const playCallback = mockAudio.addEventListener.mock.calls
+      .find(call => call[0] === 'play')?.[1]
+    
+    if (playCallback) {
+      act(() => {
+        playCallback()
+      })
+    }
+
+    const timeUpdateCallback = mockAudio.addEventListener.mock.calls
+      .find(call => call[0] === 'timeupdate')?.[1]
+    
+    if (timeUpdateCallback) {
+      act(() => {
+        timeUpdateCallback()
+      })
+    }
+
+    await waitFor(() => {
+      // Should NOT show the instruction message when playing
+      expect(screen.queryByText('字幕を表示するには音声を再生してください')).not.toBeInTheDocument()
     })
   })
 

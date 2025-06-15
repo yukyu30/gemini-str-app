@@ -155,11 +155,11 @@ const AudioSubtitlePreview: React.FC<AudioSubtitlePreviewProps> = ({
             <p className="text-center text-lg font-medium px-4 py-2" data-testid="current-subtitle">
               {currentSubtitle.text}
             </p>
-          ) : (
+          ) : !isPlaying ? (
             <p className="text-muted-foreground text-sm">
               字幕を表示するには音声を再生してください
             </p>
-          )}
+          ) : null}
         </div>
 
         {/* Subtitle List */}
