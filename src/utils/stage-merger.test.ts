@@ -40,8 +40,8 @@ function mergeStagesWithDefaults(
         return [
           key, 
           actualStages?.[stageKey] ? {
-            ...defaultStage,
-            ...actualStages[stageKey]
+            ...actualStages[stageKey],
+            description: defaultStage.description
           } : defaultStage
         ]
       })
@@ -168,5 +168,42 @@ describe('Stage Merger Logic', () => {
     
     // Completed stage should have result
     expect((result.dictionaryCreation as any).result).toBe('Dictionary content here')
+  })
+
+  it('should handle scenario where final step is completed but dictionary step is missing', () => {
+    // This reproduces the user's reported issue:
+    // Dictionary step showing as "waiting" while final step shows as "completed"
+    const actualStages = {
+      initialTranscription: {
+        name: '基本文字起こし (Gemini 2.0 Flash)',
+        status: 'completed' as const,
+        result: 'Transcription result'
+      },
+      topicAnalysis: {
+        name: 'トピック分析 (Gemini 2.0 Flash)',  
+        status: 'completed' as const,
+        result: 'Topic analysis result'
+      },
+      finalTranscription: {
+        name: '最終字幕生成 (Gemini 2.5 Pro)',
+        status: 'completed' as const,
+        result: 'Final SRT result'
+      }
+      // Note: dictionaryCreation is intentionally missing to simulate the issue
+    }
+
+    const result = mergeStagesWithDefaults(actualStages)
+    
+    // First two stages should be completed
+    expect(result.initialTranscription.status).toBe('completed')
+    expect(result.topicAnalysis.status).toBe('completed')
+    
+    // Dictionary creation should remain pending (as default) since no actual data exists
+    expect(result.dictionaryCreation.status).toBe('pending')
+    expect(result.dictionaryCreation.description).toBe('トピックに関連する専門用語辞書をGoogle検索で作成します')
+    
+    // Final transcription should be completed
+    expect(result.finalTranscription.status).toBe('completed')
+    expect((result.finalTranscription as any).result).toBe('Final SRT result')
   })
 })
