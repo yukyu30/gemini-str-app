@@ -408,40 +408,38 @@ async fn save_dictionary_csv(content: String, suggestedFilename: String) -> Resu
         })?;
     
     println!("Dictionary file written successfully");
+    
     Ok(file_path.to_string_lossy().to_string())
 }
 
 #[tauri::command]
 async fn load_dictionary_csv(file_path: String) -> Result<String, String> {
-    // CSVファイルを読み込み
-    if !Path::new(&file_path).exists() {
-        return Err("Dictionary file not found".to_string());
-    }
-    
-    let content = fs::read_to_string(&file_path).await
-        .map_err(|e| format!("Failed to read dictionary file: {}", e))?;
-    
-    Ok(content)
+    fs::read_to_string(&file_path).await
+        .map_err(|e| format!("Failed to read dictionary file: {}", e))
 }
 
 #[tauri::command]
 async fn save_temp_file(file_data: Vec<u8>, file_name: String) -> Result<String, String> {
-    // Get the file extension from the original filename
-    let extension = Path::new(&file_name)
-        .extension()
-        .and_then(|ext| ext.to_str())
-        .unwrap_or("bin");
-    
-    // Create a new temp file with the correct extension
     let temp_dir = std::env::temp_dir();
-    let temp_file_path = temp_dir.join(format!("audio_temp_{}.{}", 
-        uuid::Uuid::new_v4().to_string(), extension));
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
     
-    // Write the file data
-    fs::write(&temp_file_path, file_data).await
-        .map_err(|e| format!("Failed to write temp file: {}", e))?;
+    let safe_file_name = file_name
+        .chars()
+        .map(|c| match c {
+            '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|' => '_',
+            _ => c
+        })
+        .collect::<String>();
     
-    // Return the path as string
+    let temp_file_name = format!("str_app_temp_{}_{}", timestamp, safe_file_name);
+    let temp_file_path = temp_dir.join(&temp_file_name);
+    
+    fs::write(&temp_file_path, &file_data).await
+        .map_err(|e| format!("Failed to save temporary file: {}", e))?;
+    
     Ok(temp_file_path.to_string_lossy().to_string())
 }
 
@@ -449,13 +447,19 @@ async fn save_temp_file(file_data: Vec<u8>, file_name: String) -> Result<String,
 async fn save_srt_file(content: String, suggestedFilename: String) -> Result<String, String> {
     println!("save_srt_file called with filename: {}, content length: {}", suggestedFilename, content.len());
     
-    // For now, let's use a simple approach - save to Downloads folder
+    // デバッグのため最初の100文字を出力
+    if content.len() > 100 {
+        println!("Content preview: {}...", &content[..100]);
+    } else {
+        println!("Content: {}", content);
+    }
+    
+    // ダウンロードフォルダに保存
     let downloads_dir = dirs::download_dir()
         .ok_or("Could not find downloads directory")?;
     
     println!("Downloads directory: {:?}", downloads_dir);
     
-    // Create unique filename to avoid conflicts
     let timestamp = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
@@ -473,42 +477,65 @@ async fn save_srt_file(content: String, suggestedFilename: String) -> Result<Str
     let unique_filename = format!("{}_{}.srt", safe_base_name, timestamp);
     let file_path = downloads_dir.join(&unique_filename);
     
-    println!("Attempting to write file to: {:?}", file_path);
+    println!("Attempting to write SRT file to: {:?}", file_path);
     
-    // Write the content to the file
     fs::write(&file_path, content.as_bytes()).await
         .map_err(|e| {
-            println!("Failed to write file: {}", e);
-            format!("Failed to write file: {}", e)
+            println!("Failed to write SRT file: {}", e);
+            format!("Failed to write SRT file: {}", e)
         })?;
     
-    println!("File written successfully");
+    println!("SRT file written successfully");
+    
     Ok(file_path.to_string_lossy().to_string())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_store::Builder::new().build())
-        .plugin(tauri_plugin_fs::init())
         .invoke_handler(tauri::generate_handler![
             greet,
             set_api_key,
             get_api_key,
-            get_api_key_preview,
             delete_api_key,
+            get_api_key_preview,
             debug_keyring,
             transcribe_audio,
+            get_transcription_progress,
             analyze_topic,
             create_dictionary,
             enhance_transcription_with_dictionary,
             save_dictionary_csv,
             load_dictionary_csv,
-            get_transcription_progress,
             save_temp_file,
-            save_srt_file
+            save_srt_file,
         ])
+        .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_store::Builder::new().build())
+        .plugin(tauri_plugin_opener::init())
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_srt_extraction_integration() {
+        // Test that extract_srt_content is properly integrated
+        let test_cases = vec![
+            // Case 1: Response with code block
+            ("Here's your SRT:\n\n```srt\n1\n00:00:00,000 --> 00:00:05,000\nHello\n```", "1\n00:00:00,000 --> 00:00:05,000\nHello"),
+            // Case 2: Response without code block
+            ("1\n00:00:00,000 --> 00:00:05,000\nHello", "1\n00:00:00,000 --> 00:00:05,000\nHello"),
+            // Case 3: Response with generic code block
+            ("```\n1\n00:00:00,000 --> 00:00:05,000\nHello\n```", "1\n00:00:00,000 --> 00:00:05,000\nHello"),
+        ];
+
+        for (input, expected) in test_cases {
+            let result = extract_srt_content(input);
+            assert_eq!(result, expected, "Failed for input: {}", input);
+        }
+    }
 }
