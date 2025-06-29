@@ -137,7 +137,7 @@ const SrtFileCard = ({ audioFile, onUpdate, onDelete }: SrtFileCardProps) => {
         maxCharsPerSubtitle: audioFile.settings.maxCharsPerSubtitle,
         enableSpeakerDetection: audioFile.settings.enableSpeakerDetection,
         durationMs: audioDurationMs,
-        model: 'gemini-2.5-pro-preview-06-05',
+        model: 'gemini-2.5-pro',
         apiKey,
       });
 

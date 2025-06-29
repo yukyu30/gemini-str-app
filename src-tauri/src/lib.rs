@@ -267,7 +267,7 @@ async fn create_dictionary(topic: String, api_key: String) -> Result<String, Str
         topic
     );
     
-    let (dictionary, search_info) = client.generate_text_content_with_search(&prompt, "gemini-2.5-pro-preview-06-05").await
+    let (dictionary, search_info) = client.generate_text_content_with_search(&prompt, "gemini-2.5-pro").await
         .map_err(|e| format!("Failed to create dictionary with search: {}", e))?;
 
     // 検索情報をログに出力（デバッグ用）
@@ -363,7 +363,7 @@ async fn enhance_transcription_with_dictionary(
         }
     );
     
-    let raw_enhanced_result = client.generate_text_content(&prompt, "gemini-2.5-pro-preview-06-05").await
+    let raw_enhanced_result = client.generate_text_content(&prompt, "gemini-2.5-pro").await
         .map_err(|e| format!("Failed to enhance transcription: {}", e))?;
 
     // Extract SRT content, removing any code block markers
