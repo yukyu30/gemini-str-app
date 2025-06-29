@@ -227,7 +227,7 @@ async fn transcribe_audio(file_path: String, max_chars_per_subtitle: u32, enable
     // Extract SRT content, removing any code block markers
     let transcription = extract_srt_content(&raw_transcription);
 
-    Ok(transcription)
+    Ok(transcription.to_string())
 }
 
 #[tauri::command]
@@ -369,7 +369,7 @@ async fn enhance_transcription_with_dictionary(
     // Extract SRT content, removing any code block markers
     let enhanced_result = extract_srt_content(&raw_enhanced_result);
 
-    Ok(enhanced_result)
+    Ok(enhanced_result.to_string())
 }
 
 #[tauri::command]
