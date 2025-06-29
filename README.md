@@ -73,11 +73,7 @@ npm run tauri dev
 npm run tauri build
 ```
 
-## ライセンス
-
-MIT License
 
 ## 関連記事
 
-技術的な詳細については以下の記事をご覧ください：
-- [blog.md](./blog.md) - 開発の詳細とデモ実行ログ
+[Web検索を組み合わせた文字起こしアプリを作ってみた](https://zenn.dev/yu_9/articles/a63374835c7af0)
