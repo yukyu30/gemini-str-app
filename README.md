@@ -43,21 +43,14 @@ cd gemini-str-app
 npm install
 ```
 
-### 3. 環境変数の設定
-
-`.env`ファイルをプロジェクトルートに作成し、Gemini APIキーを設定：
-
-```env
-VITE_GEMINI_API_KEY=your_gemini_api_key_here
-```
 
 **APIキーの入手方法:**
 1. [Google AI Studio](https://aistudio.google.com/u/1/apikey) にアクセス
 2. Googleアカウントでログイン
 3. 「Create API Key」をクリックしてAPIキーを生成
-4. 生成されたAPIキーを`.env`ファイルに設定
+4. 生成されたAPIキーをアプリの設定画面から登録
 
-### 4. 開発サーバーの起動
+### 4. 開発環境の起動
 
 ```bash
 npm run tauri dev
@@ -74,19 +67,11 @@ npm run tauri dev
 
 ## ビルド
 
-### 開発用ビルド
-```bash
-npm run build
-```
 
 ### 本番用ビルド（実行ファイル生成）
 ```bash
 npm run tauri build
 ```
-
-## 推奨IDE設定
-
-- [VS Code](https://code.visualstudio.com/) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
 
 ## ライセンス
 
