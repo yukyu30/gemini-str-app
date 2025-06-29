@@ -5,6 +5,9 @@ use tokio::fs;
 mod gemini;
 use gemini::GeminiClient;
 
+mod srt_utils;
+use srt_utils::extract_srt_content;
+
 const SERVICE_NAME: &str = "gemini-str-app";
 const API_KEY_ENTRY: &str = "gemini_api_key";
 

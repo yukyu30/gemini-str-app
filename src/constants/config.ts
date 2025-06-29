@@ -10,14 +10,14 @@ export const SUPPORTED_AUDIO_FORMATS = [
 
 export const GEMINI_MODELS = [
   {
-    id: 'gemini-2.0-flash',
-    name: 'Gemini 2.0 Flash',
+    id: 'gemini-2.5-pro',
+    name: 'Gemini 2.5 Pro',
     description: '高速で費用効率的'
   },
   {
-    id: 'gemini-2.5-pro-preview-06-05',
-    name: 'Gemini 2.5 Pro Preview',
-    description: '最新のプレビューモデル'
+    id: 'gemini-2.5-pro',
+    name: 'Gemini 2.5 Pro',
+    description: '最新のモデル'
   }
 ] as const;
 

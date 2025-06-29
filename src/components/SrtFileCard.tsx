@@ -60,7 +60,7 @@ const SrtFileCard = ({ audioFile, onUpdate, onDelete }: SrtFileCardProps) => {
   const getAudioDurationMs = async (file: File): Promise<number> => {
     return new Promise((resolve, reject) => {
       const audio = new Audio();
-      
+
       const handleLoadedMetadata = () => {
         const durationMs = Math.round(audio.duration * 1000);
         cleanup();
@@ -188,7 +188,7 @@ const SrtFileCard = ({ audioFile, onUpdate, onDelete }: SrtFileCardProps) => {
 
       // ステップ1: 基本文字起こし
       onUpdate(audioFile.id, {
-        progress: 'ステップ 3/7: 基本文字起こし中... (Gemini 2.0 Flash)',
+        progress: 'ステップ 3/7: 基本文字起こし中... (Gemini 2.5 Pro)',
       });
 
       const initialResult = await invoke<string>('transcribe_audio', {
@@ -196,7 +196,7 @@ const SrtFileCard = ({ audioFile, onUpdate, onDelete }: SrtFileCardProps) => {
         maxCharsPerSubtitle: audioFile.settings.maxCharsPerSubtitle,
         enableSpeakerDetection: audioFile.settings.enableSpeakerDetection,
         durationMs: audioDurationMs,
-        model: 'gemini-2.0-flash',
+        model: 'gemini-2.5-pro',
         apiKey,
       });
 
@@ -324,16 +324,16 @@ const SrtFileCard = ({ audioFile, onUpdate, onDelete }: SrtFileCardProps) => {
       console.log('Attempting to download SRT with:', {
         contentLength: audioFile.result.length,
         filename,
-        resultPreview: audioFile.result.substring(0, 100) + '...'
+        resultPreview: audioFile.result.substring(0, 100) + '...',
       });
-      
+
       const savedPath = await invoke<string>('save_srt_file', {
         content: audioFile.result,
         suggestedFilename: filename,
       });
-      
+
       console.log('SRT file saved successfully at:', savedPath);
-      
+
       toast({
         title: 'ダウンロード完了',
         description: `${filename} をダウンロードしました\n保存先: ${savedPath}`,
@@ -345,12 +345,14 @@ const SrtFileCard = ({ audioFile, onUpdate, onDelete }: SrtFileCardProps) => {
         stack: error instanceof Error ? error.stack : undefined,
         filename,
         hasResult: !!audioFile.result,
-        resultLength: audioFile.result?.length || 0
+        resultLength: audioFile.result?.length || 0,
       });
       toast({
         variant: 'destructive',
         title: 'ダウンロードエラー',
-        description: `ファイルのダウンロードに失敗しました: ${error instanceof Error ? error.message : String(error)}`,
+        description: `ファイルのダウンロードに失敗しました: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
       });
     }
   };
@@ -756,21 +758,24 @@ const SrtFileCard = ({ audioFile, onUpdate, onDelete }: SrtFileCardProps) => {
                 <div className="text-sm text-muted-foreground">
                   {audioFile.subtitles
                     ? `合計 ${audioFile.subtitles.length} 個の字幕が生成されました`
-                    : audioFile.srtValidation && !audioFile.srtValidation.isValid
+                    : audioFile.srtValidation &&
+                        !audioFile.srtValidation.isValid
                       ? 'SRT形式の解析に失敗しましたが、生のテキストを表示・ダウンロードできます'
                       : 'テキストが生成されました'}
                 </div>
               </div>
             )}
 
-            {activeTab === 'preview' && audioFile.subtitles && audioFile.subtitles.length > 0 && (
-              <div className="space-y-3">
-                <AudioSubtitlePreview
-                  audioFile={audioFile.file}
-                  subtitles={audioFile.subtitles}
-                />
-              </div>
-            )}
+            {activeTab === 'preview' &&
+              audioFile.subtitles &&
+              audioFile.subtitles.length > 0 && (
+                <div className="space-y-3">
+                  <AudioSubtitlePreview
+                    audioFile={audioFile.file}
+                    subtitles={audioFile.subtitles}
+                  />
+                </div>
+              )}
           </div>
         )}
 
