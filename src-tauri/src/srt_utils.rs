@@ -120,4 +120,41 @@ mod tests {
         let result = extract_srt_content(input);
         assert_eq!(result, expected);
     }
+
+    #[test]
+    fn test_extract_srt_with_explanation_after() {
+        let input = "```srt\n1\n00:00:00,000 --> 00:00:05,000\nHello World\n```\n\nThis SRT file contains a simple greeting.";
+        let expected = "1\n00:00:00,000 --> 00:00:05,000\nHello World";
+        let result = extract_srt_content(input);
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_extract_srt_with_backticks_in_content() {
+        // Test case where SRT content might contain backticks as part of dialogue
+        let input = "```srt\n1\n00:00:00,000 --> 00:00:05,000\nHe said `hello` to me\n```";
+        let expected = "1\n00:00:00,000 --> 00:00:05,000\nHe said `hello` to me";
+        let result = extract_srt_content(input);
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_extract_srt_real_world_example() {
+        let input = r#"I've generated the SRT subtitles for your audio file:
+
+```srt
+1
+00:00:00,520 --> 00:00:03,910
+これは最初の字幕です
+
+2
+00:00:04,150 --> 00:00:07,300
+そして、これが2番目の字幕です
+```
+
+The subtitles have been properly timed and formatted."#;
+        let expected = "1\n00:00:00,520 --> 00:00:03,910\nこれは最初の字幕です\n\n2\n00:00:04,150 --> 00:00:07,300\nそして、これが2番目の字幕です";
+        let result = extract_srt_content(input);
+        assert_eq!(result, expected);
+    }
 }
