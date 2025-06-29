@@ -221,8 +221,11 @@ async fn transcribe_audio(file_path: String, max_chars_per_subtitle: u32, enable
     };
 
     // Generate transcription
-    let transcription = client.generate_content(&file_info.uri, &file_info.mime_type, &prompt, &selected_model).await
+    let raw_transcription = client.generate_content(&file_info.uri, &file_info.mime_type, &prompt, &selected_model).await
         .map_err(|e| format!("Failed to generate transcription: {}", e))?;
+
+    // Extract SRT content, removing any code block markers
+    let transcription = extract_srt_content(&raw_transcription);
 
     Ok(transcription)
 }
@@ -360,8 +363,11 @@ async fn enhance_transcription_with_dictionary(
         }
     );
     
-    let enhanced_result = client.generate_text_content(&prompt, "gemini-2.5-pro-preview-06-05").await
+    let raw_enhanced_result = client.generate_text_content(&prompt, "gemini-2.5-pro-preview-06-05").await
         .map_err(|e| format!("Failed to enhance transcription: {}", e))?;
+
+    // Extract SRT content, removing any code block markers
+    let enhanced_result = extract_srt_content(&raw_enhanced_result);
 
     Ok(enhanced_result)
 }
